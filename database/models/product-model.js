@@ -11,7 +11,7 @@ const ProductSchema = new mongoose.Schema({
     required: true,
   },
   batchId: String,
-  qrPath: String 
+  
 });
 
 module.exports = mongoose.model("Product", ProductSchema);
