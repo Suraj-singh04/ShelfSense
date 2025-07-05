@@ -16,7 +16,7 @@ const addProducts = async (req, res) => {
       category,
       expiryDate,
       batchId,
-      qrPath // Save the QR code path in the product
+    
     });
 
     res.status(201).json({ message: "Product created", data: newProduct });
