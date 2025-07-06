@@ -20,4 +20,5 @@ const RetailerSchema = new mongoose.Schema({
   ],
 });
 
+
 module.exports = mongoose.model("Retailer", RetailerSchema);
