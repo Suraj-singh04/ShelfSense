@@ -11,5 +11,4 @@ router.post("/add", addProducts);
 router.get("/get", getAllProducts);
 router.get("/search", searchProducts);
 
-
 module.exports = router;

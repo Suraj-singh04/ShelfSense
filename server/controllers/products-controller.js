@@ -1,5 +1,5 @@
 const Product = require("../../database/models/product-model");
-const generateQRCode = require("../../utils/generateQR");// Generate QR code utility
+const generateQRCode = require("../../utils/generateQR"); // Generate QR code utility
 const addProducts = async (req, res) => {
   try {
     const { name, category, expiryDate, batchId } = req.body;
@@ -43,8 +43,6 @@ const searchProducts = async (req, res) => {
   const products = await Product.find({ name: new RegExp(name, "i") });
   res.json(products);
 };
-
-
 
 module.exports = {
   addProducts,
