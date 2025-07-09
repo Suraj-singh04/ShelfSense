@@ -12,8 +12,8 @@ const assignToRetailerRoutes = require("./routes/assignToRetailer");
 // clearAllData();
 // seed();
 const suggestionRoutes = require("./routes/suggestions");
+const runSmartRoutingScheduler = require("./scheduler");
 
-connectToDB();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -24,9 +24,17 @@ app.use("/api/products", products);
 app.use("/api/retailer", retailer);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/smart-routing", smartRoutingRoutes);
-app.use("api/assign", assignToRetailerRoutes);
-app.use("api/suggestions", suggestionRoutes);
+app.use("/api/assign", assignToRetailerRoutes);
+app.use("/api/suggestions", suggestionRoutes);
 
-app.listen(PORT, () => {
-  console.log("Server is running");
-});
+connectToDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log("Server is running");
+    });
+    runSmartRoutingScheduler();
+  })
+  .catch((err) => {
+    console.error("failed to load");
+  });
+

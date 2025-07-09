@@ -1,4 +1,3 @@
-// /api/services/suggestionService.js
 const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 
 const createPendingSuggestion = async (
@@ -26,7 +25,7 @@ const createPendingSuggestion = async (
   });
 
   console.log(
-    `🔔 Suggestion Created: Notify Retailer (${retailerId}) to confirm purchase of ${quantity} units for product ${productId}.`
+    `🔔 Suggestion Created: Notify Retailer (${retailerId}) to confirm purchase of ${quantity} units for product ${product._id}.`
   );
 
   return newSuggestion;

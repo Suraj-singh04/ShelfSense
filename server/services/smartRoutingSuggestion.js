@@ -29,7 +29,7 @@ const getSmartRoutingSuggestion = async (productId) => {
 
   const bestRetailer = topRetailers[0].retailer;
 
-  // Fetch full retailer data to get salesData
+  // full retailer data to get salesData
   const retailerData = await Retailer.findById(bestRetailer._id);
 
   const salesEntry = retailerData.salesData.find(

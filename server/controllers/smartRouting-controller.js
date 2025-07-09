@@ -1,4 +1,5 @@
 const Product = require("../../database/models/product-model");
+const Inventory = require("../../database/models/inventory-model");
 const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
 
 const getExpiringProductSuggestions = async (req, res) => {
@@ -8,21 +9,27 @@ const getExpiringProductSuggestions = async (req, res) => {
       Date.now() + thresholdDays * 24 * 60 * 60 * 1000
     );
 
-    const expiringProducts = await Product.find({
+    const expiringInventory = await Inventory.find({
       expiryDate: { $lte: thresholdDate },
+      currentStatus: "in_inventory",
+      quantity: { $gt: 0 },
     });
 
     const suggestions = [];
 
-    for (const product of expiringProducts) {
-      const suggestion = await getSmartRoutingSuggestion(product._id);
+    for (const inventoryItem of expiringInventory) {
+      const suggestion = await getSmartRoutingSuggestion(
+        inventoryItem.productId
+      );
+      const product = await Product.findById(inventoryItem.productId);
 
       suggestions.push({
         product: {
           id: product._id,
           name: product.name,
           expiresInDays: Math.ceil(
-            (new Date(product.expiryDate) - Date.now()) / (1000 * 60 * 60 * 24)
+            (new Date(inventoryItem.expiryDate) - Date.now()) /
+              (1000 * 60 * 60 * 24)
           ),
         },
         suggestion,
