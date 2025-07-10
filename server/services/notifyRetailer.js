@@ -3,7 +3,7 @@ const Retailer = require("../../database/models/retailer-model");
 const notifyRetailer = async (retailerId, message) => {
   const retailer = await Retailer.findById(retailerId);
   if (!retailer) {
-    console.log(`❌ Retailer ${retailerId} not found`);
+    console.log(`Retailer ${retailerId} not found`);
     return;
   }
 

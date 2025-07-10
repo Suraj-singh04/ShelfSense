@@ -1,11 +1,11 @@
 const express = require("express");
 const {
   addToInventory,
-  getAllProducts,
+  getAllInventoryItems,
 } = require("../controllers/inventory-controller");
 const router = express.Router();
 
 router.post("/add", addToInventory);
-router.get("/get", getAllProducts);
+router.get("/get", getAllInventoryItems);
 
 module.exports = router;

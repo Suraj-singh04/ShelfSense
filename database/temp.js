@@ -11,7 +11,7 @@ const clearAllData = async () => {
     await Purchase.deleteMany({});
 
     console.log("✅ All collections cleared!");
-    process.exit(); // Exit script
+    process.exit(); 
   } catch (err) {
     console.error("Error clearing collections:", err);
   }

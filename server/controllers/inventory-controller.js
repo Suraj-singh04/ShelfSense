@@ -51,7 +51,7 @@ const addToInventory = async (req, res) => {
   }
 };
 
-const getAllProducts = async (req, res) => {
+const getAllInventoryItems = async (req, res) => {
   try {
     const products = await Inventory.find().sort({ expiryDate: 1 });
     res.status(200).json({ success: true, products });
@@ -65,5 +65,5 @@ const getAllProducts = async (req, res) => {
 
 module.exports = {
   addToInventory,
-  getAllProducts,
+  getAllInventoryItems,
 };

@@ -1,16 +1,14 @@
-// routes/suggestions.js
-
 const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 const Purchase = require("../../database/models/purchase-model");
 const Inventory = require("../../database/models/inventory-model");
-const Product = require("../../database/models/product-model");
+const smartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const fallbackSuggestionHandler = require("../services/fallback");
 
-// 🔹 GET all pending suggestions for a retailer
 const pendingSuggestions = async (req, res) => {
   try {
     const suggestions = await SuggestedPurchase.find({
       retailerId: req.params.retailerId,
-      confirmed: false,
+      status: "pending",
     }).populate("productId");
 
     res.status(200).json({ success: true, suggestions });
@@ -20,13 +18,12 @@ const pendingSuggestions = async (req, res) => {
   }
 };
 
-// 🔹 POST to confirm a suggestion
 const confirmSuggestion = async (req, res) => {
   try {
     const suggestion = await SuggestedPurchase.findById(
       req.params.suggestionId
     );
-    if (!suggestion || suggestion.confirmed) {
+    if (!suggestion) {
       return res
         .status(404)
         .json({ message: "Suggestion not found or already confirmed" });
@@ -46,7 +43,7 @@ const confirmSuggestion = async (req, res) => {
       quantity: suggestion.quantity,
     });
 
-    suggestion.confirmed = true;
+    suggestion.status = "confirmed";
     await suggestion.save();
 
     res
@@ -58,7 +55,30 @@ const confirmSuggestion = async (req, res) => {
   }
 };
 
+const rejectSuggestion = async (req, res) => {
+  try {
+    const suggestion = await SuggestedPurchase.findById(
+      req.params.suggestionId
+    );
+    if (!suggestion || suggestion.status !== "pending") {
+      return res
+        .status(404)
+        .json({ message: "Suggestion not found or not pending." });
+    }
+
+    suggestion.status = "rejected";
+    await suggestion.save();
+    await fallbackSuggestionHandler();
+
+    res.status(200).json({ message: "Suggestion rejected successfully." });
+  } catch (err) {
+    console.error("Reject Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   pendingSuggestions,
   confirmSuggestion,
+  rejectSuggestion,
 };

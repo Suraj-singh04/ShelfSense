@@ -9,7 +9,7 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   category: String,
   batches: [batchSchema],
-  qrPath: String,
+  // qrPath: String,
 });
 
 module.exports = mongoose.model("Product", productSchema);

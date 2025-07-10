@@ -1,7 +1,9 @@
 const cron = require("node-cron");
 const Product = require("../database/models/product-model");
+const Inventory = require("../database/models/inventory-model");
 const getSmartRoutingSuggestion = require("./services/smartRoutingSuggestion");
 const SuggestedPurchase = require("../database/models/suggested-purchase-model");
+const fallbackSuggestionHandler = require("./services/fallback");
 
 const runSmartRoutingScheduler = async () => {
   try {
@@ -17,7 +19,7 @@ const runSmartRoutingScheduler = async () => {
     for (const product of expiringProducts) {
       const existingSuggestion = await SuggestedPurchase.findOne({
         productId: product._id,
-        confirmed: false,
+        status: "pending",
       });
 
       if (existingSuggestion) {
@@ -42,14 +44,30 @@ const runSmartRoutingScheduler = async () => {
       }
     }
   } catch (err) {
-    console.error("🛑 Scheduler Error:", err.message);
+    console.error("Scheduler Error:", err.message);
   }
 };
 
-// Schedule to run every 2 days at midnight
 cron.schedule("0 0 */2 * *", () => {
   console.log("🔄 Running Smart Routing Scheduler...");
   runSmartRoutingScheduler();
+});
+
+cron.schedule("0 1 * * *", () => {
+  console.log("🔁 Running fallback handler...");
+  fallbackSuggestionHandler();
+});
+
+cron.schedule("0 2 * * *", async () => {
+  try {
+    const result = await Inventory.updateMany(
+      { expiryDate: { $lt: Date.now() }, currentStatus: "in_inventory" },
+      { $set: { currentStatus: "expired" } }
+    );
+    console.log(`Marked ${result.modifiedCount} inventory items as expired`);
+  } catch (err) {
+    console.error("Error marking expired inventory:", err.message);
+  }
 });
 
 module.exports = runSmartRoutingScheduler;

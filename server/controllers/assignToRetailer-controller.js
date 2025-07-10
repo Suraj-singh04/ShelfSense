@@ -1,6 +1,7 @@
 const Product = require("../../database/models/product-model");
 const Inventory = require("../../database/models/inventory-model");
 const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 
 const assignRetailersToExpiringProducts = async (req, res) => {
   try {
@@ -17,7 +18,7 @@ const assignRetailersToExpiringProducts = async (req, res) => {
     const results = [];
 
     for (const product of expiringProducts) {
-      // Get available inventory for this product (unassigned only)
+      // Get available inventory for this product
       const availableInventories = await Inventory.find({
         productId: product._id,
         assignedRetailer: null,
@@ -26,6 +27,16 @@ const assignRetailersToExpiringProducts = async (req, res) => {
 
       if (availableInventories.length === 0) continue;
 
+      const existingSuggestion = await SuggestedPurchase.findOne({
+        productId: product._id,
+        status: "pending",
+      });
+
+      if (existingSuggestion) {
+        console.log(`Skipping ${product.name}, already has a suggestion.`);
+        continue;
+      }
+
       // Get best retailer suggestion
       const suggestion = await getSmartRoutingSuggestion(product._id);
       if (!suggestion.suggestedRetailer?.id) continue;
@@ -33,7 +44,7 @@ const assignRetailersToExpiringProducts = async (req, res) => {
       // Assign each inventory item to suggested retailer
       for (const item of availableInventories) {
         item.assignedRetailer = suggestion.suggestedRetailer.id;
-        item.currentStatus = "assigned"; // optional status change
+        item.currentStatus = "assigned";
         await item.save();
       }
 

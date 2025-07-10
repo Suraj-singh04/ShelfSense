@@ -2,7 +2,6 @@ const Purchase = require("../../database/models/purchase-model");
 const Retailer = require("../../database/models/retailer-model");
 
 const getTopRetailersForProduct = async (productId) => {
-  // Step 1: Get purchases for the product
   const purchases = await Purchase.aggregate([
     { $match: { productId } },
     {
@@ -13,7 +12,6 @@ const getTopRetailersForProduct = async (productId) => {
     },
   ]);
 
-  // Step 2: Fetch their sales data
   const retailerIds = purchases.map((p) => p._id);
 
   const retailers = await Retailer.find({
@@ -33,7 +31,7 @@ const getTopRetailersForProduct = async (productId) => {
     const totalSold = salesEntry?.unitsSold || 0;
     const totalPurchased = purchaseEntry.totalPurchased;
 
-    // Calculate sales efficiency
+    //sales efficiency
     const efficiency = totalPurchased ? totalSold / totalPurchased : 0;
 
     results.push({
@@ -44,7 +42,6 @@ const getTopRetailersForProduct = async (productId) => {
     });
   }
 
-  // Step 3: Sort by efficiency (and fallback to sold or purchased)
   results.sort((a, b) => {
     return (
       b.efficiency - a.efficiency ||
@@ -53,7 +50,7 @@ const getTopRetailersForProduct = async (productId) => {
     );
   });
 
-  return results.slice(0, 5); // Return top 5
+  return results.slice(0, 5);
 };
 
 module.exports = getTopRetailersForProduct;

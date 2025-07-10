@@ -21,9 +21,10 @@ const suggestedPurchaseSchema = new mongoose.Schema({
     required: true,
     min: 1,
   },
-  confirmed: {
-    type: Boolean,
-    default: false,
+  status: {
+    type: String,
+    enum: ["pending", "confirmed", "rejected", "expired", "reassigned"],
+    default: "pending",
   },
   suggestedAt: {
     type: Date,

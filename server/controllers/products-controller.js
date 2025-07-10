@@ -1,22 +1,32 @@
 const Product = require("../../database/models/product-model");
-const generateQRCode = require("../../utils/generateQR"); // Generate QR code utility
+const generateQRCode = require("../../utils/generateQR");
 const addProducts = async (req, res) => {
   try {
-    const { name, category, expiryDate, batchId } = req.body;
+    const { name, category, batches } = req.body;
 
-    if (!name || !category || !expiryDate || !batchId) {
+    if (
+      !name ||
+      !category ||
+      !batches ||
+      !Array.isArray(batches) ||
+      batches.length === 0
+    ) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // ✅ Step 2: Generate the QR code
-    const qrPath = await generateQRCode(name, expiryDate);
+    // const qrPath = await generateQRCode(name, expiryDate);
+    for (const batch of batches) {
+      if (!batch.batchId || !batch.expiryDate) {
+        return res
+          .status(400)
+          .json({ error: "Each batch must have batchId and expiryDate" });
+      }
+    }
 
     const newProduct = await Product.create({
       name,
       category,
-      expiryDate,
-      batchId,
-      qrPath, // Save the QR code path in the product
+      batches,
     });
 
     res.status(201).json({ message: "Product created", data: newProduct });
