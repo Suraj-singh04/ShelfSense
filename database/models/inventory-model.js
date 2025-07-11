@@ -1,22 +1,17 @@
 const mongoose = require("mongoose");
 
-const InventorySchema = new mongoose.Schema({
+const inventorySchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Product",
     required: true,
   },
-  quantity: {
-    type: Number,
-    required: true,
-  },
-  addedDate: {
-    type: Date,
-    default: Date.now,
-  },
+  batchId: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  expiryDate: { type: Date, required: true },
   currentStatus: {
     type: String,
-    enum: ["in_inventory", "sent_to_retailer"],
+    enum: ["in_inventory", "assigned", "sold", "expired"],
     default: "in_inventory",
   },
   assignedRetailer: {
@@ -24,6 +19,10 @@ const InventorySchema = new mongoose.Schema({
     ref: "Retailer",
     default: null,
   },
+  addedDate: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-module.exports = mongoose.model("Inventory", InventorySchema);
+module.exports = mongoose.model("Inventory", inventorySchema);
