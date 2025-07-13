@@ -4,6 +4,9 @@ const connectToDB = require("../database/db");
 const inventory = require("./routes/inventory");
 const products = require("./routes/product");
 const retailer = require("./routes/retailer");
+const authRoutes = require("./routes/auth-routes");
+const homeRoutes = require("./routes/home-routes");
+const adminRoutes = require("./routes/admin-routes");
 const purchaseRoutes = require("./routes/purchase");
 const smartRoutingRoutes = require("./routes/smart-routing");
 const assignToRetailerRoutes = require("./routes/assignToRetailer");
@@ -22,6 +25,9 @@ app.use(express.json());
 app.use("/api/inventory", inventory);
 app.use("/api/products", products);
 app.use("/api/retailer", retailer);
+app.use("/api/home", homeRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/smart-routing", smartRoutingRoutes);
 app.use("/api/assign", assignToRetailerRoutes);
@@ -37,4 +43,3 @@ connectToDB()
   .catch((err) => {
     console.error("failed to load");
   });
-

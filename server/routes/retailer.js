@@ -1,18 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const {
-  addRetailer,
+  // addRetailer,
   addSalesData,
   getAvailableProducts,
   placeOrder,
   getRetailerOrders,
 } = require("../controllers/retailer-controller");
+const authMiddleware = require("../middleware/auth-middleware");
 
-router.post("/add", addRetailer);
-router.post("/:retailerId/sales", addSalesData);
-router.get("/available-products", getAvailableProducts);
-router.post("/order", placeOrder);
-router.get("/:retailerId/orders", getRetailerOrders);
-
+// router.post("/add", addRetailer);
+router.post("/sales", authMiddleware, addSalesData);
+router.get("/available-products", authMiddleware, getAvailableProducts);
+router.post("/orders", placeOrder);
+router.get("/orders", authMiddleware, getRetailerOrders);
 
 module.exports = router;

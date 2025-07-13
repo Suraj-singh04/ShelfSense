@@ -3,33 +3,33 @@ const Product = require("../../database/models/product-model");
 const Inventory = require("../../database/models/inventory-model");
 const Purchase = require("../../database/models/purchase-model");
 
-const addRetailer = async (req, res) => {
-  try {
-    const { name, location, salesData } = req.body;
+// const addRetailer = async (req, res) => {
+//   try {
+//     const { name, location, salesData } = req.body;
 
-    if (!name || !location) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+//     if (!name || !location) {
+//       return res.status(400).json({ error: "Missing required fields" });
+//     }
 
-    if (!Array.isArray(salesData)) {
-      return res.status(400).json({ error: "Sales data must be an array" });
-    }
+//     if (!Array.isArray(salesData)) {
+//       return res.status(400).json({ error: "Sales data must be an array" });
+//     }
 
-    const newRetailer = await Retailer.create({
-      name,
-      location,
-      salesData,
-    });
-    res.status(201).json({ message: "Retailer created", data: newRetailer });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+//     const newRetailer = await Retailer.create({
+//       name,
+//       location,
+//       salesData,
+//     });
+//     res.status(201).json({ message: "Retailer created", data: newRetailer });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// };
 
 const addSalesData = async (req, res) => {
   try {
     const { productName, unitsSold } = req.body;
-    const { retailerId } = req.params;
+    const { retailerId } = req.userInfo.userId;
 
     // Find product by name
     const product = await Product.findOne({ name: productName });
@@ -106,7 +106,8 @@ const getAvailableProducts = async (req, res) => {
 
 const placeOrder = async (req, res) => {
   try {
-    const { retailerId, productId, quantity } = req.body;
+    const { productId, quantity } = req.body;
+    const retailerId = req.userInfo.userId;
 
     if (!retailerId || !productId || !quantity || quantity < 1) {
       return res.status(400).json({
@@ -168,7 +169,7 @@ const placeOrder = async (req, res) => {
 
 const getRetailerOrders = async (req, res) => {
   try {
-    const { retailerId } = req.params;
+    const { retailerId } = req.userInfo.userId;
 
     const orders = await Purchase.find({ retailerId }).sort({ createdAt: -1 });
 
@@ -191,7 +192,7 @@ const getRetailerOrders = async (req, res) => {
 };
 
 module.exports = {
-  addRetailer,
+  // addRetailer,
   addSalesData,
   getAvailableProducts,
   placeOrder,

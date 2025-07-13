@@ -18,7 +18,10 @@ const RetailerSchema = new mongoose.Schema({
       lastSold: Date,
     },
   ],
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
 });
-
 
 module.exports = mongoose.model("Retailer", RetailerSchema);

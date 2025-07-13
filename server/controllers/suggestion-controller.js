@@ -7,7 +7,7 @@ const fallbackSuggestionHandler = require("../services/fallback");
 const pendingSuggestions = async (req, res) => {
   try {
     const suggestions = await SuggestedPurchase.find({
-      retailerId: req.params.retailerId,
+      retailerId: req.userInfo.userId,
       status: "pending",
     }).populate("productId");
 

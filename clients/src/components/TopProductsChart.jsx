@@ -7,10 +7,17 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const TopProductsChart = () => {
   const data = {
@@ -19,25 +26,25 @@ const TopProductsChart = () => {
       {
         label: "Units Sold",
         data: [120, 95, 80, 60, 45],
-        backgroundColor: "#60a5fa"
-      }
-    ]
+        backgroundColor: "#60a5fa",
+      },
+    ],
   };
 
- const options = {
-responsive: true,
-plugins: {
-tooltip: {
-callbacks: {
-label: function (context) {
-return context.dataset.label + ": " + context.raw + " units sold";
-},
-},
-},
-legend: { position: "top" },
-title: { display: true, text: "Top Performing Products (Units Sold)" },
-},
-};
+  const options = {
+    responsive: true,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return context.dataset.label + ": " + context.raw + " units sold";
+          },
+        },
+      },
+      legend: { position: "top" },
+      title: { display: true, text: "Top Performing Products (Units Sold)" },
+    },
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-md p-4">
