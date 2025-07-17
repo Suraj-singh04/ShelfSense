@@ -1,26 +1,12 @@
-import React, { useState } from "react";
-import Sidebar from "../components/Sidebar";
-import TopHeader from "../components/TopHeader";
+import React from "react";
 import TopProductsChart from "../components/TopProductsChart";
 import StockOvertimeChart from "../components/StockOvertimeChart";
 import SellThroughChart from "../components/SellThroughChart";
 import HistoryGraph from "../components/HistoryGraph";
 
 const Dashboard = () => {
-  const [darkMode, setDarkMode] = useState(false);
-  const toggleDarkMode = () => setDarkMode(!darkMode);
-
   return (
-    <div className={`${darkMode ? "dark" : ""}`}>
-      <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-white transition-all duration-300">
-        {/* Sidebar */}
-        <Sidebar />
-
-        {/* Main Content */}
-        <div className="flex-1 w-full overflow-hidden">
-          <TopHeader darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-
-          <main className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+    <main className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-6">
               <h2 className="text-3xl font-bold flex items-center gap-2">
@@ -74,9 +60,6 @@ const Dashboard = () => {
               <TopProductsChart />
             </div>
           </main>
-        </div>
-      </div>
-    </div>
   );
 };
 

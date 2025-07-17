@@ -7,8 +7,8 @@ const {
 const authMiddleware = require("../middleware/auth-middleware");
 const router = express.Router();
 
-router.get("/retailer/pending-Suggestions", authMiddleware, pendingSuggestions);
-router.post("/confirm/:suggestionId", authMiddleware.apply, confirmSuggestion);
+router.get("/retailer/pending-suggestions", authMiddleware, pendingSuggestions);
+router.post("/confirm/:suggestionId", authMiddleware, confirmSuggestion);
 router.post("/reject/:suggestionId", authMiddleware, rejectSuggestion);
 
 module.exports = router;

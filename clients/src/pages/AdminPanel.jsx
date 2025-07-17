@@ -1,152 +1,98 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Package,
-  ShoppingCart,
-  Users,
-  Activity,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Plus,
-  Filter,
-  Search,
-  BarChart3,
-  TrendingUp,
-  Calendar,
-  MapPin,
-  Eye,
-  RefreshCw,
-  Zap,
-} from "lucide-react";
+  FaBox,
+  FaShoppingCart,
+  FaUsers,
+  FaChartLine,
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaClock,
+  FaPlus,
+  FaFilter,
+  FaSearch,
+  FaChartBar,
+  FaCalendar,
+  FaMapMarkerAlt,
+  FaEye,
+  FaSync,
+  FaBolt,
+  FaSpinner
+} from "react-icons/fa";
+import { adminAPI } from "../api";
 
-const SmartInventoryDashboard = () => {
+const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Data states
+  const [inventoryData, setInventoryData] = useState([]);
+  const [productsData, setProductsData] = useState([]);
+  const [suggestionsData, setSuggestionsData] = useState([]);
+
+  // Form states
+  const [productForm, setProductForm] = useState({
+    name: "",
+    category: "",
+    batches: [{ batchId: "", expiryDate: "" }]
+  });
+
+  const [inventoryForm, setInventoryForm] = useState({
+    productName: "",
+    quantity: "",
+    batchId: "",
+    expiryDate: ""
+  });
+
+  // Filters
   const [filters, setFilters] = useState({
     productName: "",
     status: "",
     expiryRange: "",
   });
 
-  // Sample data
-  const inventoryData = [
-    {
-      id: 1,
-      productName: "Organic Milk",
-      batchId: "BT-2024-001",
-      quantity: 150,
-      expiryDate: "2025-07-15",
-      status: "in_inventory",
-      assignedRetailer: null,
-    },
-    {
-      id: 2,
-      productName: "Fresh Bread",
-      batchId: "BT-2024-002",
-      quantity: 80,
-      expiryDate: "2025-07-13",
-      status: "assigned",
-      assignedRetailer: "Green Mart",
-    },
-    {
-      id: 3,
-      productName: "Antibiotics",
-      batchId: "BT-2024-003",
-      quantity: 25,
-      expiryDate: "2025-07-12",
-      status: "in_inventory",
-      assignedRetailer: null,
-    },
-    {
-      id: 4,
-      productName: "Yogurt",
-      batchId: "BT-2024-004",
-      quantity: 0,
-      expiryDate: "2025-07-10",
-      status: "expired",
-      assignedRetailer: null,
-    },
-  ];
+  // Load data on component mount
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const productsData = [
-    {
-      id: 1,
-      name: "Organic Milk",
-      category: "Dairy",
-      batches: 3,
-      recentBatches: ["BT-2024-001", "BT-2024-005"],
-      nearestExpiry: "2025-07-15",
-    },
-    {
-      id: 2,
-      name: "Fresh Bread",
-      category: "Bakery",
-      batches: 2,
-      recentBatches: ["BT-2024-002", "BT-2024-006"],
-      nearestExpiry: "2025-07-13",
-    },
-    {
-      id: 3,
-      name: "Antibiotics",
-      category: "Medicine",
-      batches: 1,
-      recentBatches: ["BT-2024-003"],
-      nearestExpiry: "2025-07-12",
-    },
-  ];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-  const retailersData = [
-    {
-      id: 1,
-      name: "Green Mart",
-      location: "Downtown",
-      salesVolume: 15420,
-      productsCount: 45,
-    },
-    {
-      id: 2,
-      name: "FreshCo",
-      location: "Suburbs",
-      salesVolume: 12350,
-      productsCount: 38,
-    },
-    {
-      id: 3,
-      name: "MediPlus Pharmacy",
-      location: "City Center",
-      salesVolume: 8750,
-      productsCount: 22,
-    },
-  ];
+      // Load inventory data
+      const inventoryResponse = await adminAPI.getAllInventory();
+      if (inventoryResponse.success) {
+        setInventoryData(inventoryResponse.data.products || []);
+      }
 
-  const routingLogsData = [
-    {
-      id: 1,
-      product: "Organic Milk - BT-2024-001",
-      retailer: "Green Mart",
-      status: "confirmed",
-      date: "2025-07-11",
-      confidence: 95,
-    },
-    {
-      id: 2,
-      product: "Fresh Bread - BT-2024-002",
-      retailer: "FreshCo",
-      status: "pending",
-      date: "2025-07-11",
-      confidence: 87,
-    },
-    {
-      id: 3,
-      product: "Antibiotics - BT-2024-003",
-      retailer: "MediPlus Pharmacy",
-      status: "rejected",
-      date: "2025-07-10",
-      confidence: 72,
-    },
-  ];
+      // Load products data
+      const productsResponse = await adminAPI.getAllProducts();
+      if (productsResponse.success) {
+        setProductsData(productsResponse.data.products || []);
+      }
+
+      // Load suggestions data (if endpoint exists)
+      try {
+        const suggestionsResponse = await adminAPI.getAllSuggestions();
+        if (suggestionsResponse.success) {
+          setSuggestionsData(suggestionsResponse.data || []);
+        }
+      } catch (err) {
+        console.log("Suggestions endpoint not available yet");
+      }
+
+    } catch (error) {
+      console.error("Error loading data:", error);
+      setError("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper functions
   const getDaysUntilExpiry = (expiryDate) => {
@@ -160,13 +106,13 @@ const SmartInventoryDashboard = () => {
   const getStatusIcon = (status) => {
     switch (status) {
       case "in_inventory":
-        return <Package className="w-4 h-4 text-blue-500" />;
+        return <FaBox className="w-4 h-4 text-blue-500" />;
       case "assigned":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <FaCheckCircle className="w-4 h-4 text-green-500" />;
       case "expired":
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <FaTimesCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
+        return <FaClock className="w-4 h-4 text-gray-500" />;
     }
   };
 
@@ -190,44 +136,44 @@ const SmartInventoryDashboard = () => {
   };
 
   // Filter inventory data
-  const filteredInventory = useMemo(() => {
-    return inventoryData.filter((item) => {
-      const matchesName = item.productName
-        .toLowerCase()
-        .includes(filters.productName.toLowerCase());
-      const matchesStatus = !filters.status || item.status === filters.status;
+  const filteredInventory = inventoryData.filter((item) => {
+    const matchesName = item.productName
+      ? item.productName.toLowerCase().includes(filters.productName.toLowerCase())
+      : true;
+    const matchesStatus = !filters.status || item.currentStatus === filters.status;
 
-      let matchesExpiry = true;
-      if (filters.expiryRange) {
-        const days = getDaysUntilExpiry(item.expiryDate);
-        if (filters.expiryRange === "expiring_soon") {
-          matchesExpiry = days <= 10;
-        } else if (filters.expiryRange === "expired") {
-          matchesExpiry = days < 0;
-        }
+    let matchesExpiry = true;
+    if (filters.expiryRange && item.expiryDate) {
+      const days = getDaysUntilExpiry(item.expiryDate);
+      if (filters.expiryRange === "expiring_soon") {
+        matchesExpiry = days <= 10;
+      } else if (filters.expiryRange === "expired") {
+        matchesExpiry = days < 0;
       }
+    }
 
-      return matchesName && matchesStatus && matchesExpiry;
-    });
-  }, [filters]);
+    return matchesName && matchesStatus && matchesExpiry;
+  });
 
   // Summary metrics
   const metrics = {
     totalProducts: productsData.length,
-    totalInventory: inventoryData.reduce((sum, item) => sum + item.quantity, 0),
+    totalInventory: inventoryData.reduce((sum, item) => sum + (item.quantity || 0), 0),
     expiringSoon: inventoryData.filter(
       (item) =>
+        item.expiryDate &&
         getDaysUntilExpiry(item.expiryDate) <= 10 &&
         getDaysUntilExpiry(item.expiryDate) > 0
     ).length,
     assignedToRetailers: inventoryData.filter(
-      (item) => item.status === "assigned"
+      (item) => item.currentStatus === "assigned"
     ).length,
-    rejectedSuggestions: routingLogsData.filter(
+    rejectedSuggestions: suggestionsData.filter(
       (log) => log.status === "rejected"
     ).length,
   };
 
+  // Modal functions
   const openModal = (type) => {
     setModalType(type);
     setShowAddModal(true);
@@ -236,70 +182,238 @@ const SmartInventoryDashboard = () => {
   const closeModal = () => {
     setShowAddModal(false);
     setModalType("");
+    setProductForm({ name: "", category: "", batches: [{ batchId: "", expiryDate: "" }] });
+    setInventoryForm({ productName: "", quantity: "", batchId: "", expiryDate: "" });
+  };
+
+  // Form handlers
+  const handleProductFormChange = (field, value) => {
+    setProductForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleInventoryFormChange = (field, value) => {
+    setInventoryForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const addBatchToProduct = () => {
+    setProductForm(prev => ({
+      ...prev,
+      batches: [...prev.batches, { batchId: "", expiryDate: "" }]
+    }));
+  };
+
+  const removeBatchFromProduct = (index) => {
+    setProductForm(prev => ({
+      ...prev,
+      batches: prev.batches.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateBatch = (index, field, value) => {
+    setProductForm(prev => ({
+      ...prev,
+      batches: prev.batches.map((batch, i) =>
+        i === index ? { ...batch, [field]: value } : batch
+      )
+    }));
+  };
+
+  // Submit handlers
+  const handleAddProduct = async () => {
+    try {
+      const response = await adminAPI.addProduct(productForm);
+      if (response.success) {
+        closeModal();
+        loadData(); // Reload data
+        alert("Product added successfully!");
+      } else {
+        alert("Failed to add product: " + response.error);
+      }
+    } catch (error) {
+      alert("Error adding product: " + error.message);
+    }
+  };
+
+  const handleAddInventory = async () => {
+    try {
+      const response = await adminAPI.addInventoryItem(inventoryForm);
+      if (response.success) {
+        closeModal();
+        loadData(); // Reload data
+        alert("Inventory item added successfully!");
+      } else {
+        alert("Failed to add inventory item: " + response.error);
+      }
+    } catch (error) {
+      alert("Error adding inventory item: " + error.message);
+    }
   };
 
   const renderModal = () => {
     if (!showAddModal) return null;
 
-    const modalContent = {
-      inventory: {
-        title: "Add New Inventory",
-        fields: ["Product Name", "Batch ID", "Quantity", "Expiry Date"],
-      },
-      product: {
-        title: "Add New Product",
-        fields: ["Product Name", "Category", "Description"],
-      },
-      retailer: {
-        title: "Add New Retailer",
-        fields: ["Retailer Name", "Location", "Contact Email", "Phone"],
-      },
-    };
-
-    const content = modalContent[modalType];
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <h3 className="text-lg font-semibold mb-4">{content.title}</h3>
-          <div className="space-y-4">
-            {content.fields.map((field, index) => (
-              <div key={index}>
-                <label className="block text-sm font-medium mb-1">
-                  {field}
-                </label>
+    if (modalType === "product") {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Add New Product</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Product Name</label>
                 <input
-                  type={
-                    field.includes("Date")
-                      ? "date"
-                      : field.includes("Quantity")
-                      ? "number"
-                      : "text"
-                  }
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => handleProductFormChange('name', e.target.value)}
                   className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                  placeholder={`Enter ${field.toLowerCase()}`}
+                  placeholder="Enter product name"
                 />
               </div>
-            ))}
+              <div>
+                <label className="block text-sm font-medium mb-1">Category</label>
+                <input
+                  type="text"
+                  value={productForm.category}
+                  onChange={(e) => handleProductFormChange('category', e.target.value)}
+                  className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter category"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Batches</label>
+                {productForm.batches.map((batch, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={batch.batchId}
+                      onChange={(e) => updateBatch(index, 'batchId', e.target.value)}
+                      className="flex-1 p-2 border rounded-md"
+                      placeholder="Batch ID"
+                    />
+                    <input
+                      type="date"
+                      value={batch.expiryDate}
+                      onChange={(e) => updateBatch(index, 'expiryDate', e.target.value)}
+                      className="flex-1 p-2 border rounded-md"
+                    />
+                    <button
+                      onClick={() => removeBatchFromProduct(index)}
+                      className="px-3 py-2 bg-red-500 text-white rounded-md"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={addBatchToProduct}
+                  className="w-full p-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                >
+                  Add Batch
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProduct}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Add Product
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end space-x-2 mt-6">
-            <button
-              onClick={closeModal}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={closeModal}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Add {modalType}
-            </button>
+        </div>
+      );
+    }
+
+    if (modalType === "inventory") {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add New Inventory Item</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Product Name</label>
+                <select
+                  value={inventoryForm.productName}
+                  onChange={(e) => handleInventoryFormChange('productName', e.target.value)}
+                  className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Product</option>
+                  {productsData.map((product) => (
+                    <option key={product._id} value={product.name}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantity</label>
+                <input
+                  type="number"
+                  value={inventoryForm.quantity}
+                  onChange={(e) => handleInventoryFormChange('quantity', e.target.value)}
+                  className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter quantity"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Batch ID</label>
+                <input
+                  type="text"
+                  value={inventoryForm.batchId}
+                  onChange={(e) => handleInventoryFormChange('batchId', e.target.value)}
+                  className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter batch ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Expiry Date</label>
+                <input
+                  type="date"
+                  value={inventoryForm.expiryDate}
+                  onChange={(e) => handleInventoryFormChange('expiryDate', e.target.value)}
+                  className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddInventory}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Add Inventory Item
+              </button>
+            </div>
           </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <FaSpinner className="animate-spin h-8 w-8 text-blue-600" />
+          <span className="text-lg">Loading admin panel...</span>
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -313,6 +427,12 @@ const SmartInventoryDashboard = () => {
         </div>
       </header>
 
+      {error && (
+        <div className="mx-6 mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Summary Metrics */}
       <div className="px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
@@ -324,7 +444,7 @@ const SmartInventoryDashboard = () => {
                   {metrics.totalProducts}
                 </p>
               </div>
-              <Package className="w-8 h-8 text-blue-500" />
+              <FaBox className="w-8 h-8 text-blue-500" />
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -335,7 +455,7 @@ const SmartInventoryDashboard = () => {
                   {metrics.totalInventory}
                 </p>
               </div>
-              <BarChart3 className="w-8 h-8 text-green-500" />
+              <FaChartBar className="w-8 h-8 text-green-500" />
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -346,7 +466,7 @@ const SmartInventoryDashboard = () => {
                   {metrics.expiringSoon}
                 </p>
               </div>
-              <AlertTriangle className="w-8 h-8 text-orange-500" />
+              <FaExclamationTriangle className="w-8 h-8 text-orange-500" />
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -357,7 +477,7 @@ const SmartInventoryDashboard = () => {
                   {metrics.assignedToRetailers}
                 </p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <FaCheckCircle className="w-8 h-8 text-green-500" />
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -368,7 +488,7 @@ const SmartInventoryDashboard = () => {
                   {metrics.rejectedSuggestions}
                 </p>
               </div>
-              <XCircle className="w-8 h-8 text-red-500" />
+              <FaTimesCircle className="w-8 h-8 text-red-500" />
             </div>
           </div>
         </div>
@@ -381,15 +501,15 @@ const SmartInventoryDashboard = () => {
                 {
                   id: "inventory",
                   label: "Inventory Management",
-                  icon: Package,
+                  icon: FaBox,
                 },
                 {
                   id: "products",
                   label: "Product Management",
-                  icon: ShoppingCart,
+                  icon: FaShoppingCart,
                 },
-                { id: "retailers", label: "Retailer Management", icon: Users },
-                { id: "routing", label: "Smart Routing Logs", icon: Activity },
+                { id: "retailers", label: "Retailer Management", icon: FaUsers },
+                { id: "routing", label: "Smart Routing Logs", icon: FaChartLine },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -415,7 +535,7 @@ const SmartInventoryDashboard = () => {
                 <div className="flex flex-wrap gap-4 items-center justify-between">
                   <div className="flex gap-4">
                     <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                      <FaSearch className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
                       <input
                         type="text"
                         placeholder="Search products..."
@@ -457,7 +577,7 @@ const SmartInventoryDashboard = () => {
                     onClick={() => openModal("inventory")}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    <Plus className="w-4 h-4" />
+                    <FaPlus className="w-4 h-4" />
                     <span>Add Inventory</span>
                   </button>
                 </div>
@@ -488,57 +608,55 @@ const SmartInventoryDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredInventory.map((item) => {
-                        const daysUntilExpiry = getDaysUntilExpiry(
-                          item.expiryDate
-                        );
-                        const isExpiringSoon =
-                          daysUntilExpiry <= 10 && daysUntilExpiry > 0;
+                      {filteredInventory.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="text-center py-8 text-gray-500">
+                            No inventory items found
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredInventory.map((item, index) => {
+                          const daysUntilExpiry = item.expiryDate ? getDaysUntilExpiry(item.expiryDate) : null;
+                          const isExpiringSoon = daysUntilExpiry && daysUntilExpiry <= 10 && daysUntilExpiry > 0;
 
-                        return (
-                          <tr
-                            key={item.id}
-                            className="border-b hover:bg-gray-50"
-                          >
-                            <td className="p-3 font-medium">
-                              {item.productName}
-                            </td>
-                            <td className="p-3 text-gray-600">
-                              {item.batchId}
-                            </td>
-                            <td className="p-3">{item.quantity}</td>
-                            <td
-                              className={`p-3 ${
-                                isExpiringSoon
-                                  ? "text-orange-600 font-medium"
-                                  : "text-gray-600"
-                              }`}
-                            >
-                              {item.expiryDate}
-                              {isExpiringSoon && (
-                                <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                                  {daysUntilExpiry} days
+                          return (
+                            <tr key={index} className="border-b hover:bg-gray-50">
+                              <td className="p-3 font-medium">
+                                {item.productName || "Unknown"}
+                              </td>
+                              <td className="p-3 text-gray-600">
+                                {item.batchId || "N/A"}
+                              </td>
+                              <td className="p-3">{item.quantity || 0}</td>
+                              <td className={`p-3 ${isExpiringSoon ? "text-orange-600 font-medium" : "text-gray-600"}`}>
+                                {item.expiryDate ? (
+                                  <>
+                                    {item.expiryDate}
+                                    {isExpiringSoon && (
+                                      <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                        {daysUntilExpiry} days
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  "N/A"
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs ${getStatusColor(item.currentStatus)}`}>
+                                  {getStatusIcon(item.currentStatus)}
+                                  <span className="capitalize">
+                                    {item.currentStatus ? item.currentStatus.replace("_", " ") : "Unknown"}
+                                  </span>
                                 </span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              <span
-                                className={`inline-flex items-center space-x-1 px-2 py-1 rounded text-xs ${getStatusColor(
-                                  item.status
-                                )}`}
-                              >
-                                {getStatusIcon(item.status)}
-                                <span className="capitalize">
-                                  {item.status.replace("_", " ")}
-                                </span>
-                              </span>
-                            </td>
-                            <td className="p-3 text-gray-600">
-                              {item.assignedRetailer || "-"}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              </td>
+                              <td className="p-3 text-gray-600">
+                                {item.assignedRetailer || "-"}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -553,48 +671,60 @@ const SmartInventoryDashboard = () => {
                     onClick={() => openModal("product")}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    <Plus className="w-4 h-4" />
+                    <FaPlus className="w-4 h-4" />
                     <span>Add Product</span>
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {productsData.map((product) => (
-                    <div
-                      key={product.id}
-                      className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            {product.name}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            {product.category}
-                          </p>
-                        </div>
-                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                          {product.batches} batches
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xs text-gray-500">
-                            Recent Batches:
-                          </p>
-                          <p className="text-sm font-mono">
-                            {product.recentBatches.join(", ")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">
-                            Nearest Expiry:
-                          </p>
-                          <p className="text-sm">{product.nearestExpiry}</p>
-                        </div>
-                      </div>
+                  {productsData.length === 0 ? (
+                    <div className="col-span-full text-center py-8 text-gray-500">
+                      No products found
                     </div>
-                  ))}
+                  ) : (
+                    productsData.map((product) => (
+                      <div
+                        key={product._id}
+                        className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-semibold text-gray-900">
+                              {product.name}
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              {product.category}
+                            </p>
+                          </div>
+                          <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                            {product.batches ? product.batches.length : 0} batches
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Recent Batches:
+                            </p>
+                            <p className="text-sm font-mono">
+                              {product.batches && product.batches.length > 0
+                                ? product.batches.slice(0, 2).map(b => b.batchId).join(", ")
+                                : "No batches"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Nearest Expiry:
+                            </p>
+                            <p className="text-sm">
+                              {product.batches && product.batches.length > 0
+                                ? product.batches[0].expiryDate
+                                : "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -603,55 +733,10 @@ const SmartInventoryDashboard = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Retailer Management</h3>
-                  <button
-                    onClick={() => openModal("retailer")}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Retailer</span>
-                  </button>
+                  <div className="text-gray-500">Coming soon...</div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {retailersData.map((retailer) => (
-                    <div
-                      key={retailer.id}
-                      className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            {retailer.name}
-                          </h4>
-                          <p className="text-sm text-gray-600 flex items-center">
-                            <MapPin className="w-3 h-3 mr-1" />
-                            {retailer.location}
-                          </p>
-                        </div>
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">
-                            Sales Volume:
-                          </span>
-                          <span className="text-sm font-medium">
-                            ${retailer.salesVolume.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">
-                            Products:
-                          </span>
-                          <span className="text-sm font-medium">
-                            {retailer.productsCount}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-center py-8 text-gray-500">
+                  Retailer management features will be available soon
                 </div>
               </div>
             )}
@@ -662,11 +747,11 @@ const SmartInventoryDashboard = () => {
                   <h3 className="text-lg font-semibold">Smart Routing Logs</h3>
                   <div className="flex space-x-2">
                     <button className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                      <Zap className="w-4 h-4" />
+                      <FaBolt className="w-4 h-4" />
                       <span>Run Smart Suggestion</span>
                     </button>
                     <button className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700">
-                      <RefreshCw className="w-4 h-4" />
+                      <FaSync className="w-4 h-4" />
                       <span>Run Fallback Handler</span>
                     </button>
                   </div>
@@ -694,35 +779,39 @@ const SmartInventoryDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {routingLogsData.map((log) => (
-                        <tr key={log.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 font-medium">{log.product}</td>
-                          <td className="p-3 text-gray-600">{log.retailer}</td>
-                          <td className="p-3">
-                            <span
-                              className={`inline-flex items-center px-2 py-1 rounded text-xs ${getStatusColor(
-                                log.status
-                              )}`}
-                            >
-                              {log.status}
-                            </span>
+                      {suggestionsData.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-center py-8 text-gray-500">
+                            No routing logs found
                           </td>
-                          <td className="p-3">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-16 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full"
-                                  style={{ width: `${log.confidence}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm text-gray-600">
-                                {log.confidence}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-gray-600">{log.date}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        suggestionsData.map((log, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium">{log.product || "Unknown"}</td>
+                            <td className="p-3 text-gray-600">{log.retailer || "Unknown"}</td>
+                            <td className="p-3">
+                              <span className={`inline-flex items-center px-2 py-1 rounded text-xs ${getStatusColor(log.status)}`}>
+                                {log.status || "Unknown"}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-16 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-600 h-2 rounded-full"
+                                    style={{ width: `${log.confidence || 0}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm text-gray-600">
+                                  {log.confidence || 0}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-gray-600">{log.date || "N/A"}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -738,4 +827,4 @@ const SmartInventoryDashboard = () => {
   );
 };
 
-export default SmartInventoryDashboard;
+export default AdminPanel;

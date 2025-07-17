@@ -1,59 +1,115 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { FaEye, FaEyeSlash, FaUser, FaLock, FaStore, FaUserShield } from 'react-icons/fa';
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import {
+  FaEye,
+  FaEyeSlash,
+  FaUser,
+  FaLock,
+  FaStore,
+  FaUserShield,
+} from "react-icons/fa";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: '',
-    role: 'retailer',
-    location: ''
+    email: "",
+    password: "",
+    name: "",
+    role: "retailer",
+    location: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const { login, signup } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
+  };
+
+  const validateForm = () => {
+    if (!formData.email || !formData.password) {
+      setError("Email and password are required");
+      return false;
+    }
+
+    if (!isLogin) {
+      if (!formData.name) {
+        setError("Name is required for registration");
+        return false;
+      }
+      if (formData.role === "retailer" && !formData.location) {
+        setError("Location is required for retailers");
+        return false;
+      }
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
+      return false;
+    }
+
+    // Password validation
+    if (!isLogin && formData.password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
       let result;
       if (isLogin) {
         result = await login({
-          email: formData.email,
-          password: formData.password
+          username: formData.email, // Use email as username for login
+          password: formData.password,
         });
       } else {
-        result = await signup(formData);
+        // For signup, prepare all data
+        const signupData = {
+          username: formData.email, // Use email as username
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          role: formData.role,
+          location:
+            formData.role === "retailer" ? formData.location : undefined,
+        };
+        result = await signup(signupData);
       }
 
       if (result.success) {
         // Redirect based on role
-        if (result.user.role === 'admin') {
-          navigate('/admin');
+        if (result.user.role === "admin") {
+          navigate("/admin-dashboard");
         } else {
-          navigate('/dashboard');
+          navigate("/retailer-dashboard");
         }
       } else {
-        setError(result.error);
+        setError(result.error || "An error occurred. Please try again.");
       }
     } catch (error) {
-      setError('An error occurred. Please try again.');
+      console.error("Auth error:", error);
+      setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -61,13 +117,13 @@ const Login = () => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setError('');
+    setError("");
     setFormData({
-      email: '',
-      password: '',
-      name: '',
-      role: 'retailer',
-      location: ''
+      email: "",
+      password: "",
+      name: "",
+      role: "retailer",
+      location: "",
     });
   };
 
@@ -81,10 +137,10 @@ const Login = () => {
               <FaStore className="h-8 w-8 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
+              {isLogin ? "Welcome Back" : "Create Account"}
             </h2>
             <p className="text-gray-600">
-              {isLogin ? 'Sign in to your account' : 'Join ShelfSense today'}
+              {isLogin ? "Sign in to your account" : "Join ShelfSense today"}
             </p>
           </div>
 
@@ -101,7 +157,7 @@ const Login = () => {
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name
+                    Full Name *
                   </label>
                   <div className="relative">
                     <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -119,27 +175,39 @@ const Login = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
+                    Role *
                   </label>
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <label
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${
+                        formData.role === "retailer"
+                          ? "border-teal-500 bg-teal-50"
+                          : "border-gray-300"
+                      }`}
+                    >
                       <input
                         type="radio"
                         name="role"
                         value="retailer"
-                        checked={formData.role === 'retailer'}
+                        checked={formData.role === "retailer"}
                         onChange={handleInputChange}
                         className="mr-2"
                       />
                       <FaStore className="mr-2 text-teal-600" />
                       Retailer
                     </label>
-                    <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <label
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 ${
+                        formData.role === "admin"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300"
+                      }`}
+                    >
                       <input
                         type="radio"
                         name="role"
                         value="admin"
-                        checked={formData.role === 'admin'}
+                        checked={formData.role === "admin"}
                         onChange={handleInputChange}
                         className="mr-2"
                       />
@@ -149,17 +217,17 @@ const Login = () => {
                   </div>
                 </div>
 
-                {formData.role === 'retailer' && (
+                {formData.role === "retailer" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Store Location
+                      Store Location *
                     </label>
                     <input
                       type="text"
                       name="location"
                       value={formData.location}
                       onChange={handleInputChange}
-                      required={!isLogin && formData.role === 'retailer'}
+                      required={!isLogin && formData.role === "retailer"}
                       className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder="Enter store location"
                     />
@@ -170,7 +238,7 @@ const Login = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                Email Address *
               </label>
               <input
                 type="email"
@@ -185,12 +253,12 @@ const Login = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                Password *
               </label>
               <div className="relative">
                 <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
@@ -216,10 +284,12 @@ const Login = () => {
               {loading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  {isLogin ? 'Signing in...' : 'Creating account...'}
+                  {isLogin ? "Signing in..." : "Creating account..."}
                 </div>
+              ) : isLogin ? (
+                "Sign In"
               ) : (
-                isLogin ? 'Sign In' : 'Create Account'
+                "Create Account"
               )}
             </button>
           </form>
@@ -232,7 +302,7 @@ const Login = () => {
                 onClick={toggleMode}
                 className="ml-1 text-teal-600 hover:text-teal-700 font-medium"
               >
-                {isLogin ? 'Sign up' : 'Sign in'}
+                {isLogin ? "Sign up" : "Sign in"}
               </button>
             </p>
           </div>
@@ -242,4 +312,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default Login;

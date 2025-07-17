@@ -1,30 +1,43 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { motion } from "framer-motion";
+import { suggestionAPI } from "../../api";
 
 const Suggestions = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    axios
-      .get("/api/suggestions/retailer/68700fe72da973f43591bb1b")
-      .then((res) => {
-        if (Array.isArray(res.data)) {
-          setSuggestions(res.data);
+    const fetchSuggestions = async () => {
+      try {
+        const response = await suggestionAPI.getRetailerSuggestions();
+        if (response.success) {
+          setSuggestions(response.data || []);
         } else {
           setSuggestions([]);
         }
-      })
-      .catch(() => setError("❌ Failed to load suggestions."));
+      } catch (err) {
+        setError("❌ Failed to load suggestions.");
+      }
+    };
+
+    fetchSuggestions();
   }, []);
 
-  const handleAction = (id, action) => {
-    axios.post(`/api/suggestions/${action}/${id}`)
-      .then(() => {
-        setSuggestions((prev) => prev.filter((s) => s._id !== id));
-      })
-      .catch(() => {});
+  const handleAction = async (id, action) => {
+    try {
+      let response;
+      if (action === "confirm") {
+        response = await suggestionAPI.confirm(id);
+      } else {
+        response = await suggestionAPI.reject(id);
+      }
+      
+      if (response.success) {
+        setSuggestions((prev) => prev.filter((s) => s.id !== id));
+      }
+    } catch (err) {
+      console.error("Error handling suggestion:", err);
+    }
   };
 
   return (

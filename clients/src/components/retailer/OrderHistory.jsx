@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { authorizedFetch } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-       const res = await fetch("/api/retailer/68700fe72da973f43591bb1b/orders");
-
+        const res = await authorizedFetch("/api/retailer/orders");
         const result = await res.json();
 
         if (result.success && Array.isArray(result.orders)) {
@@ -23,8 +25,8 @@ const OrderHistory = () => {
       }
     };
 
-    fetchOrders();
-  }, []);
+    if (user) fetchOrders();
+  }, [user]);
 
   return (
     <div className="max-h-64 overflow-y-auto w-full text-sm">
@@ -50,17 +52,24 @@ const OrderHistory = () => {
         </motion.p>
       ) : (
         <div className="space-y-2">
-          {orders.map((order) => (
+          {orders.map((order, i) => (
             <motion.div
-              key={order._id}
+              key={i}
               className="p-3 border rounded-lg bg-green-50 dark:bg-green-950 shadow-sm"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
             >
-              <p><strong>📦 Product:</strong> {order.product?.name}</p>
-              <p><strong>🔢 Qty:</strong> {order.quantity}</p>
-              <p><strong>📅 Date:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
+              <p>
+                <strong>📦 Product:</strong> {order.productName}
+              </p>
+              <p>
+                <strong>🔢 Qty:</strong> {order.quantity}
+              </p>
+              <p>
+                <strong>📅 Date:</strong>{" "}
+                {new Date(order.date).toLocaleDateString()}
+              </p>
             </motion.div>
           ))}
         </div>

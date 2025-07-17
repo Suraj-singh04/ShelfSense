@@ -28,36 +28,38 @@ const Purchase = require("../../database/models/purchase-model");
 
 const addSalesData = async (req, res) => {
   try {
-    const { productName, unitsSold } = req.body;
-    const { retailerId } = req.userInfo.userId;
+    const { retailerId, productName, unitsSold } = req.body;
+    // const retailerId = req.userInfo.userId;
 
-    // Find product by name
-    const product = await Product.findOne({ name: productName });
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
+    if (!productName || !unitsSold) {
+      return res
+        .status(400)
+        .json({ message: "Product and unitsSold required" });
     }
+
+    const product = await Product.findOne({ name: productName });
+    if (!product) return res.status(404).json({ message: "Product not found" });
 
     const retailer = await Retailer.findById(retailerId);
-    if (!retailer) {
-      return res.status(404).json({ message: "Retailer not found." });
-    }
+    if (!retailer)
+      return res.status(404).json({ message: "Retailer not found" });
 
-    const salesEntry = retailer.salesData.find(
-      (entry) => entry.productId.toString() === product._id.toString()
+    const existing = retailer.salesData.find(
+      (s) => s.productId.toString() === product._id.toString()
     );
 
-    if (salesEntry) {
-      salesEntry.unitsSold += unitsSold;
+    if (existing) {
+      existing.unitsSold += unitsSold;
     } else {
       retailer.salesData.push({ productId: product._id, unitsSold });
     }
 
     await retailer.save();
 
-    res.status(200).json({ success: true, message: "Sales data updated." });
+    res.status(200).json({ success: true, message: "Sales data recorded" });
   } catch (err) {
-    console.error("Sales Data Error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Add Sales Error:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -169,7 +171,7 @@ const placeOrder = async (req, res) => {
 
 const getRetailerOrders = async (req, res) => {
   try {
-    const { retailerId } = req.userInfo.userId;
+    const retailerId = req.userInfo.userId;
 
     const orders = await Purchase.find({ retailerId }).sort({ createdAt: -1 });
 
@@ -191,10 +193,23 @@ const getRetailerOrders = async (req, res) => {
   }
 };
 
+const getAllRetailers = async (req, res) => {
+  try {
+    const retailers = await Retailer.find({});
+    res.status(200).json({ success: true, retailers });
+  } catch (error) {
+    console.error("Error fetching retailers:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch retaiers" });
+  }
+};
+
 module.exports = {
   // addRetailer,
   addSalesData,
   getAvailableProducts,
   placeOrder,
   getRetailerOrders,
+  getAllRetailers,
 };

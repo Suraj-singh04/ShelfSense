@@ -15,12 +15,24 @@ const addProducts = async (req, res) => {
     }
 
     // const qrPath = await generateQRCode(name, expiryDate);
-    for (const batch of batches) {
-      if (!batch.batchId || !batch.expiryDate) {
-        return res
-          .status(400)
-          .json({ error: "Each batch must have batchId and expiryDate" });
+
+    let existingProduct = await Product.findOne({ name, category });
+
+    if (existingProduct) {
+      for (const batch of batches) {
+        const alreadyExists = existingProduct.batches.some(
+          (b) => b.batchId === batch.batchId
+        );
+        if (!alreadyExists) {
+          existingProduct.batches.push(batch);
+        }
       }
+
+      await existingProduct.save();
+      return res.status(200).json({
+        message: "Batches added to existing product",
+        data: existingProduct,
+      });
     }
 
     const newProduct = await Product.create({
