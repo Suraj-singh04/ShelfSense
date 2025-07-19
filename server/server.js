@@ -13,12 +13,14 @@ const smartRoutingRoutes = require("./routes/smart-routing");
 const assignToRetailerRoutes = require("./routes/assignToRetailer");
 const suggestionRoutes = require("./routes/suggestions");
 const runSmartRoutingScheduler = require("./scheduler");
+const updatePurchaseRecords = require("../database/up");
 
 // Uncomment these when needed for development
 // const clearAllData = require("../database/temp");
 // const seed = require("./seed");
 // clearAllData();
 // seed();
+updatePurchaseRecords();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

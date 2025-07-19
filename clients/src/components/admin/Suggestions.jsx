@@ -1,92 +1,133 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { motion } from "framer-motion";
+const PurchaseSuggestions = () => {
+  const expiringProducts = [
+    {
+      id: 1,
+      name: "Organic Milk",
+      currentStock: 25,
+      expiryDate: "2024-07-25",
+      daysLeft: 7,
+      suggestedOrder: 50,
+      supplier: "Dairy Farm Co.",
+    },
+    {
+      id: 2,
+      name: "Fresh Bread",
+      currentStock: 15,
+      expiryDate: "2024-07-22",
+      daysLeft: 4,
+      suggestedOrder: 30,
+      supplier: "Bakery Plus",
+    },
+    {
+      id: 3,
+      name: "Yogurt Cups",
+      currentStock: 40,
+      expiryDate: "2024-07-28",
+      daysLeft: 10,
+      suggestedOrder: 60,
+      supplier: "Dairy Farm Co.",
+    },
+    {
+      id: 4,
+      name: "Salad Mix",
+      currentStock: 8,
+      expiryDate: "2024-07-21",
+      daysLeft: 3,
+      suggestedOrder: 25,
+      supplier: "Green Vegetables Ltd.",
+    },
+    {
+      id: 5,
+      name: "Chicken Breast",
+      currentStock: 12,
+      expiryDate: "2024-07-24",
+      daysLeft: 6,
+      suggestedOrder: 20,
+      supplier: "Meat Masters",
+    },
+  ];
 
-const Suggestions = () => {
-  const [suggestions, setSuggestions] = useState([]);
-  const [error, setError] = useState("");
+  const getPriorityColor = (daysLeft) => {
+    if (daysLeft <= 3) return "bg-red-100 text-red-800 border-red-200";
+    if (daysLeft <= 7) return "bg-orange-100 text-orange-800 border-orange-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  };
 
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      try {
-        const res = await authorizedFetch("/api/smart-routing/my-suggestions");
-        const data = await res.json();
-        if (res.ok) {
-          setSuggestions(data.suggestions);
-        } else {
-          setError("❌ Failed to load suggestions");
-        }
-      } catch (err) {
-        setError("❌ Server error while loading suggestions");
-      }
-    };
-
-    fetchSuggestions();
-  }, []);
-
-  const handleAction = (id, action) => {
-    axios
-      .post(`/api/suggestions/${action}/${id}`)
-      .then(() => {
-        setSuggestions((prev) => prev.filter((s) => s._id !== id));
-      })
-      .catch(() => {});
+  const getPriorityText = (daysLeft) => {
+    if (daysLeft <= 3) return "Critical";
+    if (daysLeft <= 7) return "High";
+    return "Medium";
   };
 
   return (
-    <div className="flex flex-col items-center text-gray-800 dark:text-white">
-      <motion.h2
-        className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        💡 Smart Suggestions
-      </motion.h2>
-      {error && <p className="text-red-500">{error}</p>}
-      <div className="w-full max-w-3xl space-y-4">
-        {suggestions.length === 0 ? (
-          <motion.p
-            className="text-gray-500 dark:text-gray-400 animate-pulse"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+    <div className="p-6">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">
+        Purchase Suggestions - Expiring Products
+      </h2>
+      <div className="space-y-4">
+        {expiringProducts.map((product) => (
+          <div
+            key={product.id}
+            className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-400"
           >
-            No suggestions available.
-          </motion.p>
-        ) : (
-          suggestions.map((item) => (
-            <motion.div
-              key={item._id}
-              className="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-950 rounded-lg shadow-md"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <p className="text-lg font-semibold">{item.productName}</p>
-              <p>
-                <strong>Qty:</strong> {item.quantity}
-              </p>
-              <p>
-                <strong>Reason:</strong> {item.reason}
-              </p>
-              <div className="flex gap-4 mt-4">
-                <button
-                  onClick={() => handleAction(item._id, "confirm")}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-                >
-                  ✅ Accept
-                </button>
-                <button
-                  onClick={() => handleAction(item._id, "reject")}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
-                >
-                  ❌ Reject
-                </button>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {product.name}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Supplier: {product.supplier}
+                </p>
               </div>
-            </motion.div>
-          ))
-        )}
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(
+                  product.daysLeft
+                )}`}
+              >
+                {getPriorityText(product.daysLeft)} Priority
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-600">Current Stock</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {product.currentStock} units
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Expiry Date</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {product.expiryDate}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Days Left</p>
+                <p className="text-lg font-semibold text-red-600">
+                  {product.daysLeft} days
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Suggested Order</p>
+                <p className="text-lg font-semibold text-green-600">
+                  {product.suggestedOrder} units
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
+                Create Purchase Order
+              </button>
+              <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors text-sm">
+                Contact Supplier
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-export default Suggestions;
+export default PurchaseSuggestions;

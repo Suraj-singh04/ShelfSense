@@ -15,6 +15,12 @@ const PurchaseSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  retailerName: {
+    type: String,
+  },
+  productName: {
+    type: String,
+  },
   date: {
     type: Date,
     default: Date.now,

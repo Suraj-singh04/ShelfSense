@@ -7,26 +7,35 @@ const addPurchase = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
 
-    const retailerId = req.userInfo?.userId;
+    const userId = req.userInfo?.userId;
+    const retailerInRetailers = await Retailer.findOne({ userId });
 
+    if (!retailerInRetailers) {
+      return res.status(404).json({ error: "Retailer not found." });
+    }
+
+    const retailerId = retailerInRetailers._id;
     if (!retailerId || !productId || !quantity) {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
-    const retailer = await Retailer.find({
-      retailerId,
-    });
+    const retailer = await Retailer.findById(retailerId);
+    if (!retailer) {
+      return res.status(404).json({ error: "Retailer not found." });
+    }
     const retailerName = retailer.retailerName;
 
-    const product = await Product.find({ productId });
-    const productName = product.productName;
-    // STEP 1: Find the available inventory items for the product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+    const productName = product.name;
+
     const availableInventory = await Inventory.find({
       productId,
       currentStatus: "in_inventory",
       assignedRetailer: null,
-    }).sort({ expiryDate: 1 }); // optional: prioritize older stock
-
+    }).sort({ expiryDate: 1 });
     let qtyToFulfill = quantity;
 
     for (const item of availableInventory) {
@@ -35,10 +44,6 @@ const addPurchase = async (req, res) => {
       const deduct = Math.min(item.quantity, qtyToFulfill);
       item.quantity -= deduct;
       qtyToFulfill -= deduct;
-
-      if (item.quantity === 0) {
-        item.currentStatus = "sold";
-      }
 
       if (item.quantity === 0) {
         item.currentStatus = "sold";

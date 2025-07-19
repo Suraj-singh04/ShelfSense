@@ -1,27 +1,41 @@
-import { React, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { GiHamburgerMenu } from "react-icons/gi";
+import { IoMdClose } from "react-icons/io";
+import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 
-import { useAuth } from "../context/AuthContext";
-
-import AddProductForm from "../components/admin/AddProductFormFixed";
-import AddInventoryForm from "../components/admin/AddInventoryForm";
-import RetailerDetails from "../components/admin/RetailerDetailsFixed";
-import AllPurchases from "../components/admin/AllPurchases";
-import SuggestedPurchases from "../components/admin/Suggestions";
+import DashboardOverview from "../components/admin/DashboardOverview";
+import AddProducts from "../components/admin/AddProducts";
+import AddInventory from "../components/admin/AddInventory";
+import Purchases from "../components/admin/Purchases";
+import RetailerDetails from "../components/admin/RetailerDetails";
+import Suggestions from "../components/admin/Suggestions";
 import { authorizedFetch } from "../utils/api";
+// import { useAuth } from "../context/AuthContext";
 
-// const triggerSuggestionGeneration = async () => {
-//   const res = await authorizedFetch("/api/smart-routing/getSuggestions");
-//   const data = await res.json();
-//   if (data.success) alert("Suggestions generated!");
-// };
-
-// triggerSuggestionGeneration();
+const navItems = [
+  { name: "Dashboard", path: "", icon: "📊" },
+  { name: "Add Products", path: "add-products", icon: "➕" },
+  { name: "Add Inventory", path: "add-inventory", icon: "📦" },
+  { name: "Purchases", path: "purchases", icon: "🛒" },
+  { name: "Retailers", path: "retailers", icon: "👥" },
+  { name: "Suggestions", path: "suggestions", icon: "💡" },
+];
 
 const AdminDashboard = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  const isActive = (path) => {
+    const fullPath = `/admin-dashboard/${path}`;
+    return (
+      location.pathname === fullPath ||
+      (path === "" && location.pathname === "/admin-dashboard")
+    );
+  };
+
   const [productList, setProductList] = useState([]);
 
-  const { logout } = useAuth();
+  //   const { logout } = useAuth();
   const fetchProducts = async () => {
     try {
       const res = await authorizedFetch("/api/products/get");
@@ -37,101 +51,78 @@ const AdminDashboard = () => {
   }, []);
 
   return (
-    <div className="px-6 py-5 md:px-12 md:py-12 space-y-6">
-      {/* Row 1: Add Product + Add Inventory */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Add Product */}
-        <motion.div
-          className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md flex flex-col justify-center items-center h-[300px]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <h2 className="text-2xl font-bold mb-4 text-center dark:text-gray-200">
-            🧪➕ Add Product
-          </h2>
-          <p className="text-gray-500 dark:text-gray-300 text-center">
-            Add new products to your stocklist 🗂️
-          </p>
-          <AddProductForm onProductAdded={fetchProducts} />
-        </motion.div>
-
-        {/* Add Inventory */}
-        <motion.div
-          className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md flex flex-col justify-center items-center h-[300px]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        >
-          <h2 className="text-2xl font-bold mb-4 text-center dark:text-gray-200">
-            📦📈 Add Inventory
-          </h2>
-          <p className="text-gray-500 dark:text-gray-300 text-center">
-            Manage product batches and keep stock updated 🔄
-          </p>
-          <div className="w-full px-2 pt-2 pb-2"></div>
-          <AddInventoryForm products={productList} />
-        </motion.div>
-      </div>
-
-      {/* Row 2: Retailer Details + All Purchases */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Retailer Details */}
-        <motion.div
-          className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md flex flex-col justify-center items-center h-[300px]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-        >
-          <h2 className="text-2xl font-bold mb-4 text-center dark:text-gray-200">
-            🏪👥 Retailer Details
-          </h2>
-          <p className="text-gray-500 dark:text-gray-300 text-center">
-            View and manage all retailers across locations 🌍
-          </p>
-          <RetailerDetails />
-        </motion.div>
-
-        {/* All Purchases */}
-        <motion.div
-          className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md flex flex-col justify-center items-center h-[300px]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-        >
-          <h2 className="text-2xl font-bold mb-4 text-center dark:text-gray-200">
-            🧾📊 All Purchases
-          </h2>
-          <p className="text-gray-500 dark:text-gray-300 text-center">
-            Track every transaction made by retailers 📉
-          </p>
-          <AllPurchases />
-        </motion.div>
-      </div>
-
-      {/* Row 3: Suggested Purchases */}
-      <motion.div
-        className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md flex flex-col justify-center items-center h-[300px]"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.4 }}
+    <div className="flex bg-[#f9fafb]">
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-screen bg-white w-64 p-6 border-r shadow-lg z-30 transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0`}
       >
-        <h2 className="text-2xl font-bold mb-4 text-center dark:text-gray-200">
-          ✨🤖 Suggested Purchases
-        </h2>
-        <p className="text-gray-500 dark:text-gray-300 text-center">
-          AI-powered insights to help restock smartly ⚙️📦
-        </p>
-        <SuggestedPurchases />
-      </motion.div>
-      <div className="flex justify-end">
-        <button
-          onClick={logout}
-          className="mb-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-        >
-          🚪 Logout
-        </button>
-      </div>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-bold text-indigo-600">Admin Panel</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden text-gray-600 hover:text-red-500 text-2xl"
+          >
+            <IoMdClose />
+          </button>
+        </div>
+
+        <nav className="space-y-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={`/admin-dashboard/${item.path}`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                isActive(item.path)
+                  ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span>{item.icon}</span>
+              <span>{item.name}</span>
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Backdrop on small screens */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black opacity-40 z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 min-h-screen md:ml-64 overflow-y-auto p-4 md:p-8 bg-[#f9fafb]">
+        {/* Mobile hamburger */}
+        <div className="md:hidden mb-6">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-2xl text-gray-800"
+          >
+            <GiHamburgerMenu />
+          </button>
+        </div>
+
+        <Routes>
+          <Route index element={<DashboardOverview />} />
+          <Route
+            path="add-products"
+            element={<AddProducts onProductAdded={fetchProducts} />}
+          />
+          <Route
+            path="add-inventory"
+            element={<AddInventory products={productList} />}
+          />
+          <Route path="purchases" element={<Purchases />} />
+          <Route path="retailers" element={<RetailerDetails />} />
+          <Route path="suggestions" element={<Suggestions />} />
+          <Route path="*" element={<Navigate to="/admin-dashboard" />} />
+        </Routes>
+      </main>
     </div>
   );
 };
