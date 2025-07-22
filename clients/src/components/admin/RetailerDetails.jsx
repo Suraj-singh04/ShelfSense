@@ -1,89 +1,76 @@
+import { useEffect, useState } from "react";
+import { authorizedFetch } from "../../utils/api";
+import { Mail, Phone, MapPin, ShoppingBag, Wallet } from "lucide-react";
+
 const RetailerDetails = () => {
-  const retailers = [
-    {
-      id: 1,
-      name: "TechMart",
-      email: "contact@techmart.com",
-      phone: "+1-555-0123",
-      address: "123 Tech Street, Silicon Valley, CA",
-      totalOrders: 15,
-      totalSpent: 45000,
-    },
-    {
-      id: 2,
-      name: "FreshGrocer",
-      email: "info@freshgrocer.com",
-      phone: "+1-555-0456",
-      address: "456 Fresh Ave, Green City, NY",
-      totalOrders: 32,
-      totalSpent: 12500,
-    },
-    {
-      id: 3,
-      name: "BookWorld",
-      email: "books@bookworld.com",
-      phone: "+1-555-0789",
-      address: "789 Book Lane, Literary Town, TX",
-      totalOrders: 8,
-      totalSpent: 3200,
-    },
-    {
-      id: 4,
-      name: "ElectroStore",
-      email: "sales@electrostore.com",
-      phone: "+1-555-0321",
-      address: "321 Electric Blvd, Current City, FL",
-      totalOrders: 22,
-      totalSpent: 67800,
-    },
-    {
-      id: 5,
-      name: "CoffeeHub",
-      email: "hello@coffeehub.com",
-      phone: "+1-555-0654",
-      address: "654 Coffee St, Bean Town, WA",
-      totalOrders: 45,
-      totalSpent: 18900,
-    },
-  ];
+  const [retailers, setRetailers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRetailers = async () => {
+    try {
+      const res = await authorizedFetch("/api/retailer/stats");
+      const data = await res.json();
+      if (res.ok) {
+        setRetailers(data.retailers || []);
+      } else {
+        console.error("Failed to fetch retailers");
+      }
+    } catch (err) {
+      console.error("Error fetching retailers:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRetailers();
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-gray-600">Loading retailers...</div>;
+  }
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">
-        Retailer Details
+      <h2 className="text-3xl font-bold mb-8 text-gray-900">
+        Retailer Overview
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {retailers.map((retailer) => (
           <div
-            key={retailer.id}
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+            key={retailer._id}
+            className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200 hover:shadow-2xl transition-all duration-300"
           >
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              {retailer.name}
-            </h3>
-            <div className="space-y-2 text-sm text-gray-600">
-              <p>
-                <span className="font-medium">Email:</span> {retailer.email}
-              </p>
-              <p>
-                <span className="font-medium">Phone:</span> {retailer.phone}
-              </p>
-              <p>
-                <span className="font-medium">Address:</span> {retailer.address}
-              </p>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white">
+              <h3 className="text-lg font-semibold truncate">
+                {retailer.name}
+              </h3>
+              <p className="text-sm text-white/80">{retailer.email}</p>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Orders:</span>
-                <span className="font-semibold text-blue-600">
-                  {retailer.totalOrders}
-                </span>
+
+            {/* Body */}
+            <div className="p-5 space-y-3 text-gray-700 text-sm">
+              <div className="flex items-center gap-2">
+                <Phone size={16} className="text-blue-500" />
+                <span>{retailer.mobileNumber}</span>
               </div>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-sm text-gray-600">Total Spent:</span>
-                <span className="font-semibold text-green-600">
-                  ${retailer.totalSpent.toLocaleString()}
-                </span>
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-red-400" />
+                <span>{retailer.address}</span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-5 py-4 border-t border-gray-200 flex justify-between items-center text-sm">
+              <div className="flex items-center gap-2 text-gray-600">
+                <ShoppingBag size={16} />
+                <span>{retailer.totalOrders} orders</span>
+              </div>
+              <div className="flex items-center gap-2 text-green-600 font-semibold">
+                <Wallet size={16} />
+                <span>₹{retailer.totalSpent.toLocaleString()}</span>
               </div>
             </div>
           </div>

@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { IoMdClose } from "react-icons/io";
-import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 import DashboardOverview from "../components/admin/DashboardOverview";
 import AddProducts from "../components/admin/AddProducts";
@@ -10,7 +17,7 @@ import Purchases from "../components/admin/Purchases";
 import RetailerDetails from "../components/admin/RetailerDetails";
 import Suggestions from "../components/admin/Suggestions";
 import { authorizedFetch } from "../utils/api";
-// import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext"; // 
 
 const navItems = [
   { name: "Dashboard", path: "", icon: "📊" },
@@ -24,7 +31,8 @@ const navItems = [
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const isActive = (path) => {
     const fullPath = `/admin-dashboard/${path}`;
     return (
@@ -34,8 +42,8 @@ const AdminDashboard = () => {
   };
 
   const [productList, setProductList] = useState([]);
+  const [inventoryData, setInventoryData] = useState([]);
 
-  //   const { logout } = useAuth();
   const fetchProducts = async () => {
     try {
       const res = await authorizedFetch("/api/products/get");
@@ -46,9 +54,29 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchInventory = async () => {
+    try {
+      const res = await authorizedFetch("/api/inventory/get");
+      const data = await res.json();
+      if (res.ok) setInventoryData(data.products || []);
+    } catch (err) {
+      console.error("❌ Error fetching inventory:", err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchInventory();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   return (
     <div className="flex bg-[#f9fafb]">
@@ -84,6 +112,14 @@ const AdminDashboard = () => {
               <span>{item.name}</span>
             </Link>
           ))}
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 mt-6 text-red-600 hover:text-white hover:bg-gradient-to-r from-red-500 to-pink-500 rounded-xl transition-all duration-200"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
         </nav>
       </aside>
 
@@ -115,7 +151,9 @@ const AdminDashboard = () => {
           />
           <Route
             path="add-inventory"
-            element={<AddInventory products={productList} />}
+            element={
+              <AddInventory products={productList} inventory={inventoryData} />
+            }
           />
           <Route path="purchases" element={<Purchases />} />
           <Route path="retailers" element={<RetailerDetails />} />

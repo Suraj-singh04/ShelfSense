@@ -29,11 +29,15 @@ const UserSchema = new mongoose.Schema(
       enum: ["retailer", "admin"],
       default: "retailer",
     },
-    location: {
+    address: {
       type: String,
       required: function () {
         return this.role === "retailer";
       },
+    },
+    mobileNumber: {
+      type: String,
+      required: true,
     },
     isActive: {
       type: Boolean,

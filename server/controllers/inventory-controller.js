@@ -37,6 +37,7 @@ const addToInventory = async (req, res) => {
       productId,
       quantity,
       batchId: batchId.trim(),
+      price: product.price,
       expiryDate: expiryToUse,
       currentStatus: "in_inventory",
       assignedRetailer: null,
@@ -67,8 +68,10 @@ const getAllInventoryItems = async (req, res) => {
         grouped[id] = {
           _id: id,
           name: item.productId.name,
+          price: item.price,
           totalQuantity: 0,
           batches: [],
+          arrivalDate: item.addedDate,
         };
       }
 

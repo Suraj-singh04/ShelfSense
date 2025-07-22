@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -18,6 +18,7 @@ const Login = () => {
     name: "",
     role: "retailer",
     location: "",
+    mobile: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -44,20 +45,22 @@ const Login = () => {
         setError("Name is required for registration");
         return false;
       }
+      if (!formData.mobile) {
+        setError("Mobile number is required");
+        return false;
+      }
       if (formData.role === "retailer" && !formData.location) {
         setError("Location is required for retailers");
         return false;
       }
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError("Please enter a valid email address");
       return false;
     }
 
-    // Password validation
     if (!isLogin && formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
       return false;
@@ -80,19 +83,18 @@ const Login = () => {
       let result;
       if (isLogin) {
         result = await login({
-          username: formData.email, // Use email as username for login
+          username: formData.email,
           password: formData.password,
         });
       } else {
-        // For signup, prepare all data
         const signupData = {
-          username: formData.email, // Use email as username
+          username: formData.email,
           email: formData.email,
           password: formData.password,
           name: formData.name,
           role: formData.role,
-          location:
-            formData.role === "retailer" ? formData.location : undefined,
+          address: formData.role === "retailer" ? formData.location : undefined,
+          mobile: formData.mobile,
         };
         result = await signup(signupData);
       }
@@ -124,6 +126,7 @@ const Login = () => {
       name: "",
       role: "retailer",
       location: "",
+      mobile: "",
     });
   };
 
@@ -215,6 +218,21 @@ const Login = () => {
                       Admin
                     </label>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mobile Number *
+                  </label>
+                  <input
+                    type="text"
+                    name="mobile"
+                    value={formData.mobile}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Enter your mobile number"
+                  />
                 </div>
 
                 {formData.role === "retailer" && (

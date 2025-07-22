@@ -33,79 +33,70 @@ const AllPurchases = () => {
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">
-        All Purchases by Retailers
-      </h2>
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          {error && <p className="text-red-500 text-center">{error}</p>}
-          {purchases.length === 0 ? (
-            <p className="text-gray-500 text-center">
-              📭 No purchase records found.
-            </p>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Retailer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {purchases.map((purchase) => (
-                  <tr key={purchase._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      #{purchase._id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {purchase.retailerName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {purchase.productName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {purchase.quantity}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${purchase.total}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(purchase.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                          "confirm"
-                        )}`}
-                      >
-                        Confirm
-                      </span>
-                    </td>
+    <div className="p-8 bg-gradient-to-tr from-blue-50 via-white to-purple-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-3xl font-extrabold text-gray-800 mb-8 flex items-center gap-2">
+          🛒 All Purchases by Retailers
+        </h2>
+
+        <div className="bg-white/90 backdrop-blur-md shadow-2xl rounded-3xl overflow-hidden border border-gray-200">
+          <div className="overflow-x-auto">
+            {error && <p className="text-red-500 text-center py-4">{error}</p>}
+
+            {purchases.length === 0 ? (
+              <div className="py-16 text-center text-gray-500 text-lg">
+                📭 No purchase records found.
+              </div>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-blue-100 text-blue-900 uppercase text-xs font-semibold tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4"># Order ID</th>
+                    <th className="px-6 py-4">👤 Retailer</th>
+                    <th className="px-6 py-4">📦 Product</th>
+                    <th className="px-6 py-4">🔢 Quantity</th>
+                    <th className="px-6 py-4">💰 Total</th>
+                    <th className="px-6 py-4">📅 Date</th>
+                    <th className="px-6 py-4">📌 Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {purchases.map((purchase) =>
+                    purchase.orders.map((order) => (
+                      <tr
+                        key={order._id}
+                        className="transition-all hover:bg-blue-50"
+                      >
+                        <td className="px-6 py-4 font-mono text-gray-700 font-semibold">
+                          #{purchase._id}
+                        </td>
+                        <td className="px-6 py-4">
+                          {purchase.retailerName || purchase.retailerId}
+                        </td>
+                        <td className="px-6 py-4">{order.productName}</td>
+                        <td className="px-6 py-4">{order.quantity}</td>
+                        <td className="px-6 py-4 font-semibold text-green-600">
+                          ₹{order.totalPrice}
+                        </td>
+                        <td className="px-6 py-4">
+                          {new Date(purchase.date).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(
+                              "confirm"
+                            )}`}
+                          >
+                            Confirmed
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
     </div>

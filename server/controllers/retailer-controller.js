@@ -3,10 +3,10 @@ const Product = require("../../database/models/product-model");
 const Inventory = require("../../database/models/inventory-model");
 const Purchase = require("../../database/models/purchase-model");
 
+// Record sales data for a retailer (for analytics or reports)
 const addSalesData = async (req, res) => {
   try {
     const { retailerId, productName, unitsSold } = req.body;
-    // const retailerId = req.userInfo.userId;
 
     if (!productName || !unitsSold) {
       return res
@@ -32,7 +32,6 @@ const addSalesData = async (req, res) => {
     }
 
     await retailer.save();
-
     res.status(200).json({ success: true, message: "Sales data recorded" });
   } catch (err) {
     console.error("Add Sales Error:", err);
@@ -40,9 +39,9 @@ const addSalesData = async (req, res) => {
   }
 };
 
+// View all available inventory (grouped by product)
 const getAvailableProducts = async (req, res) => {
   try {
-    // Find all unassigned inventory
     const inventory = await Inventory.find({
       currentStatus: "in_inventory",
       assignedRetailer: null,
@@ -74,108 +73,46 @@ const getAvailableProducts = async (req, res) => {
       });
     }
 
-    const availableProducts = Object.values(productMap);
-
-    res.status(200).json({ success: true, data: availableProducts });
+    res.status(200).json({
+      success: true,
+      data: Object.values(productMap),
+    });
   } catch (error) {
     console.error("Error fetching available products:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-const placeOrder = async (req, res) => {
-  try {
-    const { productId, quantity } = req.body;
-     const retailerInRetailers = await Retailer.findOne({ userId });
-
-     if (!retailerInRetailers) {
-       return res.status(404).json({ error: "Retailer not found." });
-     }
-
-     const retailerId = retailerInRetailers._id;
-
-    if (!retailerId || !productId || !quantity || quantity < 1) {
-      return res.status(400).json({
-        message: "All fields are required and quantity must be positive.",
-      });
-    }
-
-    const inventoryItems = await Inventory.find({
-      productId,
-      assignedRetailer: null,
-      currentStatus: "in_inventory",
-      quantity: { $gt: 0 },
-    }).sort({ expiryDate: 1 });
-
-    let qtyLeft = quantity;
-    const allocations = [];
-
-    for (const item of inventoryItems) {
-      if (qtyLeft <= 0) break;
-
-      const takeQty = Math.min(qtyLeft, item.quantity);
-      allocations.push({ batchId: item.batchId, quantity: takeQty });
-
-      item.quantity -= takeQty;
-
-      if (item.quantity === 0) {
-        item.assignedRetailer = retailerId;
-        item.currentStatus = "assigned";
-      }
-
-      await item.save();
-      qtyLeft -= takeQty;
-    }
-
-    if (qtyLeft > 0) {
-      return res.status(400).json({
-        message: `Not enough inventory. Requested: ${quantity}, Available: ${
-          quantity - qtyLeft
-        }`,
-        allocations,
-      });
-    }
-
-    await Purchase.create({
-      retailerId,
-      productId,
-      quantity,
-    });
-
-    res.status(200).json({
-      message: "Order placed successfully",
-      allocated: allocations,
-    });
-  } catch (err) {
-    console.error("Manual order error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
+// Get all orders/purchases for a specific retailer (based on new schema)
 const getRetailerOrders = async (req, res) => {
   try {
-    const retailerId = req.userInfo.userId;
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+    const retailerId = retailer._id;
 
-    const orders = await Purchase.find({ retailerId }).sort({ createdAt: -1 });
+    const purchases = await Purchase.find({ retailerId }).sort({ date: -1 });
 
-    const result = [];
+    const formattedOrders = [];
 
-    for (const order of orders) {
-      const product = await Product.findById(order.productId);
-      result.push({
-        productName: product?.name || "Unknown",
-        quantity: order.quantity,
-        purchasedAt: order.createdAt,
-      });
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        formattedOrders.push({
+          productName: order.productName,
+          quantity: order.quantity,
+          totalPrice: order.totalPrice,
+          purchasedAt: purchase.date,
+        });
+      }
     }
 
-    res.status(200).json({ success: true, orders: result });
+    res.status(200).json({ success: true, orders: formattedOrders });
   } catch (err) {
     console.error("Fetch orders error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+// Fetch all retailers (for admin or overview)
 const getAllRetailers = async (req, res) => {
   try {
     const retailers = await Retailer.find({});
@@ -184,15 +121,63 @@ const getAllRetailers = async (req, res) => {
     console.error("Error fetching retailers:", error);
     res
       .status(500)
-      .json({ success: false, message: "Failed to fetch retaiers" });
+      .json({ success: false, message: "Failed to fetch retailers" });
+  }
+};
+
+const getRetailersWithStats = async (req, res) => {
+  try {
+    const retailers = await Retailer.find({});
+    const purchases = await Purchase.find({});
+
+    const retailerStats = {};
+
+    purchases.forEach((purchase) => {
+      const rid = purchase.retailerId?.toString();
+      if (!rid) return;
+
+      if (!retailerStats[rid]) {
+        retailerStats[rid] = {
+          totalOrders: 0,
+          totalSpent: 0,
+        };
+      }
+
+      retailerStats[rid].totalOrders += purchase.orders.length;
+
+      purchase.orders.forEach((order) => {
+        retailerStats[rid].totalSpent += order.totalPrice || 0;
+      });
+    });
+
+    const enrichedRetailers = retailers.map((ret) => {
+      const stats = retailerStats[ret._id.toString()] || {
+        totalOrders: 0,
+        totalSpent: 0,
+      };
+
+      return {
+        _id: ret._id,
+        name: ret.retailerName || ret.name,
+        email: ret.email,
+        mobileNumber: ret.mobileNumber || "N/A",
+        address: ret.address || "N/A",
+        totalOrders: stats.totalOrders,
+        totalSpent: stats.totalSpent,
+      };
+    });
+
+    res.status(200).json({ success: true, retailers: enrichedRetailers });
+  } catch (err) {
+    console.error("❌ Error getting retailer stats:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 module.exports = {
-  // addRetailer,
   addSalesData,
   getAvailableProducts,
-  placeOrder,
   getRetailerOrders,
   getAllRetailers,
+  getRetailersWithStats,
 };

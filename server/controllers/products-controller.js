@@ -1,20 +1,24 @@
 const Product = require("../../database/models/product-model");
-const generateQRCode = require("../../utils/generateQR");
+
 const addProducts = async (req, res) => {
   try {
-    const { name, category, batches } = req.body;
+    const { name, category, price, batches } = req.body;
 
     if (
       !name ||
       !category ||
+      price === undefined ||
+      isNaN(Number(price)) ||
       !batches ||
       !Array.isArray(batches) ||
       batches.length === 0
     ) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res
+        .status(400)
+        .json({ error: "All fields are required and valid" });
     }
 
-    // const qrPath = await generateQRCode(name, expiryDate);
+    const parsedPrice = Number(price);
 
     let existingProduct = await Product.findOne({ name, category });
 
@@ -38,6 +42,7 @@ const addProducts = async (req, res) => {
     const newProduct = await Product.create({
       name,
       category,
+      price: parsedPrice,
       batches,
     });
 
@@ -47,6 +52,7 @@ const addProducts = async (req, res) => {
     res.status(500).json({ error: error.message || "Server error" });
   }
 };
+
 
 const getAllProducts = async (req, res) => {
   try {

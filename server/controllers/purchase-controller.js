@@ -8,36 +8,28 @@ const addPurchase = async (req, res) => {
     const { productId, quantity } = req.body;
 
     const userId = req.userInfo?.userId;
-    const retailerInRetailers = await Retailer.findOne({ userId });
-
-    if (!retailerInRetailers) {
-      return res.status(404).json({ error: "Retailer not found." });
-    }
-
-    const retailerId = retailerInRetailers._id;
-    if (!retailerId || !productId || !quantity) {
-      return res.status(400).json({ error: "Missing required fields." });
-    }
-
-    const retailer = await Retailer.findById(retailerId);
+    const retailer = await Retailer.findOne({ userId });
     if (!retailer) {
       return res.status(404).json({ error: "Retailer not found." });
     }
-    const retailerName = retailer.retailerName;
+
+    const retailerId = retailer._id;
+    if (!productId || !quantity) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
 
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ error: "Product not found." });
     }
-    const productName = product.name;
 
     const availableInventory = await Inventory.find({
       productId,
       currentStatus: "in_inventory",
       assignedRetailer: null,
     }).sort({ expiryDate: 1 });
-    let qtyToFulfill = quantity;
 
+    let qtyToFulfill = quantity;
     for (const item of availableInventory) {
       if (qtyToFulfill <= 0) break;
 
@@ -57,13 +49,19 @@ const addPurchase = async (req, res) => {
       return res.status(400).json({ error: "Not enough inventory available." });
     }
 
-    // STEP 2: Record the purchase
+    const totalPrice = quantity * product.price;
+
     const purchase = new Purchase({
-      retailerName,
       retailerId,
-      productName,
-      productId,
-      quantity,
+      retailerName: retailer.retailerName,
+      orders: [
+        {
+          productId,
+          productName: product.name,
+          quantity,
+          totalPrice,
+        },
+      ],
     });
 
     await purchase.save();
@@ -77,15 +75,34 @@ const addPurchase = async (req, res) => {
 
 const getAllPurchases = async (req, res) => {
   try {
-    const purchases = await Purchase.find({});
-    res.status(200).json({ success: true, purchases });
+    const purchases = await Purchase.find({})
+      .populate("retailerId", "name email") // Optional: populates retailer info
+      .sort({ date: -1 }); // Optional: newest purchases first
+
+    const formatted = purchases.map((purchase) => ({
+      _id: purchase._id,
+      retailerId: purchase.retailerId?._id || purchase.retailerId,
+      retailerName: purchase.retailerId?.name || "", // only if populated
+      date: purchase.date,
+      orders: purchase.orders.map((order) => ({
+        productId: order.productId,
+        productName: order.productName,
+        quantity: order.quantity,
+        totalPrice: order.totalPrice,
+        _id: order._id,
+      })),
+    }));
+
+    res.status(200).json({ success: true, purchases: formatted });
   } catch (error) {
     console.error("Error fetching Purchases:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch Purchases" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch Purchases",
+    });
   }
 };
+
 
 module.exports = {
   addPurchase,

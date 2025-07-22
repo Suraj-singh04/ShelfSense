@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 //register controller
 const register = async (req, res) => {
   try {
-    const { username, email, password, role, location, name } = req.body;
+    const { username, email, password, role, address, name, mobile } = req.body;
 
     // Check if user already exists
     const checkExistingUser = await User.findOne({
@@ -20,7 +20,7 @@ const register = async (req, res) => {
     }
 
     // Validate required fields
-    if (!username || !email || !password) {
+    if (!username || !email || !password || !mobile) {
       return res.status(400).json({
         success: false,
         message: "Username, email, and password are required.",
@@ -36,23 +36,25 @@ const register = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      role: role || "retailer", // Fixed typo: was "retailerokay"
-      name: name || username, // Add name field
+      role: role || "retailer",
+      name: name || username,
+      mobileNumber: mobile,
     });
 
-    if ((role || "retailer") === "retailer" && location) {
-      newUser.location = location;
+    if ((role || "retailer") === "retailer" && address) {
+      newUser.address = address;
     }
 
     await newUser.save();
 
-    // If user is a retailer, create retailer profile (optional - depends on your app structure)
-    if (role === "retailer" && location) {
+    if (role === "retailer" && address) {
       const Retailer = require("../../database/models/retailer-model");
       await Retailer.create({
         name: name || username,
-        location: location,
+        email: email,
+        address: address,
         salesData: [],
+        mobileNumber: mobile,
         userId: newUser._id,
       });
     }
@@ -120,7 +122,7 @@ const login = async (req, res) => {
       },
       process.env.JWT_SECRET_KEY,
       {
-        expiresIn: "24h", // Increased from 15m for better UX
+        expiresIn: "24h",
       }
     );
 

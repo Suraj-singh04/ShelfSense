@@ -8,8 +8,11 @@ const batchSchema = new mongoose.Schema({
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   category: String,
+  price: {
+    type: Number,
+    default: 0,
+  },
   batches: [batchSchema],
-  // qrPath: String,
 });
 
 module.exports = mongoose.model("Product", productSchema);

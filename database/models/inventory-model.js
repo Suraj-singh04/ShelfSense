@@ -7,6 +7,10 @@ const inventorySchema = new mongoose.Schema({
     required: true,
   },
   batchId: { type: String, required: true },
+  price: {
+    type: Number,
+    default: 0,
+  },
   quantity: { type: Number, required: true },
   expiryDate: { type: Date, required: true },
   currentStatus: {
