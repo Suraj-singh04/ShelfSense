@@ -76,8 +76,8 @@ const addPurchase = async (req, res) => {
 const getAllPurchases = async (req, res) => {
   try {
     const purchases = await Purchase.find({})
-      .populate("retailerId", "name email") // Optional: populates retailer info
-      .sort({ date: -1 }); // Optional: newest purchases first
+      .populate("retailerId", "name email")
+      .sort({ date: -1 });
 
     const formatted = purchases.map((purchase) => ({
       _id: purchase._id,

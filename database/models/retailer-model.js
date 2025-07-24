@@ -1,5 +1,22 @@
 const mongoose = require("mongoose");
 
+const SalesEventSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    productName: { type: String, required: true },
+    unitsSold: { type: Number, required: true },
+    priceAtSale: { type: Number, required: true },
+    totalAmount: { type: Number, required: true },
+    saleDate: { type: Date, default: Date.now },
+    batchId: { type: String },
+  },
+  { _id: true }
+);
+
 const RetailerSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -15,16 +32,7 @@ const RetailerSchema = new mongoose.Schema({
   email: {
     type: String,
   },
-  salesData: [
-    {
-      productId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-      },
-      unitsSold: Number,
-      lastSold: Date,
-    },
-  ],
+  salesData: [SalesEventSchema],
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

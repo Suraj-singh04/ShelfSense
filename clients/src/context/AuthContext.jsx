@@ -5,7 +5,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true); // ✅ Add this
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
       setToken(storedToken);
     }
 
-    setLoading(false); // ✅ Done loading after checking
+    setLoading(false);
   }, []);
 
   const login = async ({ username, password }) => {
@@ -34,13 +34,13 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("user", JSON.stringify(data.user));
         setUser(data.user);
         setToken(data.accessToken);
-        return { success: true, user: data.user }; // ✅ required
+        return { success: true, user: data.user };
       } else {
-        return { success: false, error: data.message || "Login failed" }; // ✅ required
+        return { success: false, error: data.message || "Login failed" };
       }
     } catch (error) {
       console.error("Login error:", error);
-      return { success: false, error: "Network or server error" }; // ✅ required
+      return { success: false, error: "Network or server error" };
     }
   };
 
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        return { success: true, user: data.user }; // ✅ return result
+        return { success: true, user: data.user };
       } else {
         return { success: false, error: data.message || "Signup failed" };
       }

@@ -1,5 +1,3 @@
-// pages/RetailerDashboard.jsx
-
 import React, { useState } from "react";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { IoMdClose } from "react-icons/io";
@@ -17,6 +15,7 @@ import DashboardOverview from "../components/retailer/DashboardOverview";
 import AvailableProducts from "../components/retailer/AvailableProducts";
 import OrderHistory from "../components/retailer/OrderHistory";
 import { useAuth } from "../context/AuthContext";
+import AddSales from "../components/retailer/AddSales";
 
 const navItems = [
   { name: "Dashboard", path: "", icon: "🏠" },
@@ -178,6 +177,8 @@ const RetailerDashboard = () => {
             <Route index element={<DashboardOverview />} />
             <Route path="buy-products" element={<AvailableProducts />} />
             <Route path="order-history" element={<OrderHistory />} />
+            <Route path="daily-sales" element={<AddSales />} />
+
             <Route path="*" element={<Navigate to="/retailer-dashboard" />} />
           </Routes>
         </main>
