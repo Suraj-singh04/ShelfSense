@@ -47,6 +47,4 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster queries
-
 module.exports = mongoose.model("User", UserSchema);

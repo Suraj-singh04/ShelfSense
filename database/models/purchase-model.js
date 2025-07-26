@@ -28,4 +28,7 @@ const PurchaseSchema = new mongoose.Schema({
   },
 });
 
+PurchaseSchema.index({ retailerId: 1, date: -1 });
+PurchaseSchema.index({ "orders.productId": 1 });
+
 module.exports = mongoose.model("Purchase", PurchaseSchema);

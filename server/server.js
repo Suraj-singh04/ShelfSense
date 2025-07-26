@@ -15,6 +15,9 @@ const assignToRetailerRoutes = require("./routes/assignToRetailer");
 const suggestionRoutes = require("./routes/suggestions");
 
 const runSmartRoutingScheduler = require("./scheduler");
+// const clearAllData = require("../database/temp");
+
+// clearAllData();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -7,12 +7,12 @@ const registerModel = require("./models/register-model");
 
 const clearAllData = async () => {
   try {
-    await Inventory.deleteMany({});
-    await Product.deleteMany({});
-    await Retailer.deleteMany({});
-    await Purchase.deleteMany({});
+    // await Inventory.deleteMany({});
+    // await Product.deleteMany({});
+    // await Retailer.deleteMany({});
+    // await Purchase.deleteMany({});
     await suggestedPurchaseModel.deleteMany({});
-    await registerModel.deleteMany({});
+    // await registerModel.deleteMany({});
 
     console.log("✅ All collections cleared!");
     process.exit();

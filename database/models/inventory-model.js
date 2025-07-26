@@ -29,4 +29,7 @@ const inventorySchema = new mongoose.Schema({
   },
 });
 
+inventorySchema.index({ expiryDate: 1, currentStatus: 1, quantity: 1 });
+inventorySchema.index({ productId: 1 });
+
 module.exports = mongoose.model("Inventory", inventorySchema);

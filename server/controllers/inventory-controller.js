@@ -1,5 +1,6 @@
 const Inventory = require("../../database/models/inventory-model");
 const Product = require("../../database/models/product-model");
+const refreshSmartSuggestion = require("../services/refreshSmartSuggestion");
 
 const addToInventory = async (req, res) => {
   try {
@@ -42,6 +43,8 @@ const addToInventory = async (req, res) => {
       currentStatus: "in_inventory",
       assignedRetailer: null,
     });
+
+    await refreshSmartSuggestion(productId, inventoryItem._id);
 
     return res.status(201).json({
       message: "Inventory added successfully",

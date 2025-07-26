@@ -12,3 +12,4 @@ router.post("/confirm/:suggestionId", authMiddleware, confirmSuggestion);
 router.post("/reject/:suggestionId", authMiddleware, rejectSuggestion);
 
 module.exports = router;
+

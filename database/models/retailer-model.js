@@ -39,4 +39,6 @@ const RetailerSchema = new mongoose.Schema({
   },
 });
 
+RetailerSchema.index({ "salesData.productId": 1, "salesData.saleDate": -1 });
+
 module.exports = mongoose.model("Retailer", RetailerSchema);

@@ -15,4 +15,6 @@ const productSchema = new mongoose.Schema({
   batches: [batchSchema],
 });
 
+
+
 module.exports = mongoose.model("Product", productSchema);

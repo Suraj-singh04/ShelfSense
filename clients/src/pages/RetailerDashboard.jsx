@@ -16,6 +16,7 @@ import AvailableProducts from "../components/retailer/AvailableProducts";
 import OrderHistory from "../components/retailer/OrderHistory";
 import { useAuth } from "../context/AuthContext";
 import AddSales from "../components/retailer/AddSales";
+import SmartSuggestions from "../components/retailer/SmartSuggestions";
 
 const navItems = [
   { name: "Dashboard", path: "", icon: "🏠" },
@@ -178,6 +179,7 @@ const RetailerDashboard = () => {
             <Route path="buy-products" element={<AvailableProducts />} />
             <Route path="order-history" element={<OrderHistory />} />
             <Route path="daily-sales" element={<AddSales />} />
+            <Route path="recommendations" element={<SmartSuggestions />} />
 
             <Route path="*" element={<Navigate to="/retailer-dashboard" />} />
           </Routes>

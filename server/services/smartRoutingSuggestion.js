@@ -6,41 +6,35 @@ const { createPendingSuggestion } = require("./createSuggestion");
 
 const getSmartRoutingSuggestion = async (productId) => {
   const product = await Product.findById(productId);
-  if (!product) {
-    return { message: "Product not found." };
-  }
+  if (!product) return { message: "Product not found." };
 
   const inventoryItem = await Inventory.findOne({
     productId,
     currentStatus: "in_inventory",
+    quantity: { $gt: 0 },
   });
-
-  if (!inventoryItem || inventoryItem.quantity < 1) {
-    return { message: "Not enough stock for this product." };
-  }
+  if (!inventoryItem) return { message: "Not enough stock for this product." };
 
   const topRetailers = await getTopRetailersForProduct(productId);
 
+  // *** If nobody has sold this product, do not suggest it ***
   if (!topRetailers.length) {
     return {
-      message: "No retailer purchase history available for this product.",
+      message:
+        "No retailer has sales history for this product. Skipping suggestion.",
     };
   }
 
   const bestRetailer = topRetailers[0].retailer;
-
-  // full retailer data to get salesData
   const retailerData = await Retailer.findById(bestRetailer._id);
 
-  const salesEntry = retailerData.salesData.find(
-    (entry) => entry.productId.toString() === productId.toString()
-  );
+  const totalUnitsSold = retailerData.salesData
+    .filter((e) => e.productId.toString() === productId.toString())
+    .reduce((acc, e) => acc + e.unitsSold, 0);
 
-  let suggestedQuantity = salesEntry ? salesEntry.unitsSold : 1;
-
-  if (suggestedQuantity > inventoryItem.quantity) {
-    suggestedQuantity = inventoryItem.quantity;
-  }
+  // use sold quantity (or any smarter heuristic you want)
+  let suggestedQuantity = Math.max(totalUnitsSold, 1);
+  suggestedQuantity = Math.min(suggestedQuantity, inventoryItem.quantity);
 
   const suggestion = await createPendingSuggestion(
     product,
@@ -54,12 +48,11 @@ const getSmartRoutingSuggestion = async (productId) => {
     suggestedRetailer: {
       id: bestRetailer._id,
       name: bestRetailer.name,
-      location: bestRetailer.location,
     },
-    reason: "Top buyer based on sales history",
+    reason: "Top buyer with existing sales history",
     suggestionId: suggestion._id,
     suggestedQuantity,
-    status: "pending",
+    status: suggestion.status,
   };
 };
 

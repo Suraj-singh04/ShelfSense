@@ -1,7 +1,8 @@
 const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 const Purchase = require("../../database/models/purchase-model");
 const Inventory = require("../../database/models/inventory-model");
-const smartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const Product = require("../../database/models/product-model");
+const Retailer = require("../../database/models/retailer-model");
 const fallbackSuggestionHandler = require("../services/fallback");
 
 const pendingSuggestions = async (req, res) => {
@@ -34,13 +35,26 @@ const confirmSuggestion = async (req, res) => {
       return res.status(400).json({ message: "Not enough stock in inventory" });
     }
 
+    const product = await Product.findById(suggestion.productId);
+    const retailer = await Retailer.findById(suggestion.retailerId);
+
+    // Decrement inventory
     inventoryItem.quantity -= suggestion.quantity;
     await inventoryItem.save();
 
+    // Create a proper Purchase document
     await Purchase.create({
-      productId: suggestion.productId,
       retailerId: suggestion.retailerId,
-      quantity: suggestion.quantity,
+      retailerName: retailer?.name,
+      orders: [
+        {
+          productId: suggestion.productId,
+          productName: product?.name,
+          quantity: suggestion.quantity,
+          totalPrice: suggestion.quantity * (inventoryItem.price || 0),
+        },
+      ],
+      date: new Date(),
     });
 
     suggestion.status = "confirmed";

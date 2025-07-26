@@ -1,11 +1,27 @@
 const Product = require("../../database/models/product-model");
 const Inventory = require("../../database/models/inventory-model");
+const Retailer = require("../../database/models/retailer-model");
+const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const {
+  generateSuggestionsForExpiringProducts,
+} = require("../services/generateSuggestions");
+
+let lastRunAt = 0;
+const THROTTLE_MS = 60_000;
+
+async function maybeGenerate() {
+  const now = Date.now();
+  if (now - lastRunAt > THROTTLE_MS) {
+    await generateSuggestionsForExpiringProducts();
+    lastRunAt = now;
+  }
+}
 
 const getExpiringProductSuggestions = async (req, res) => {
   const suggestions = [];
   try {
-    const thresholdDays = 10;
+    const thresholdDays = 60;
     const thresholdDate = new Date(
       Date.now() + thresholdDays * 24 * 60 * 60 * 1000
     );
@@ -21,6 +37,10 @@ const getExpiringProductSuggestions = async (req, res) => {
         inventoryItem.productId
       );
       const product = await Product.findById(inventoryItem.productId);
+
+      if (suggestion.message?.startsWith("No retailer has sales history")) {
+        continue;
+      }
 
       suggestions.push({
         product: {
@@ -44,8 +64,17 @@ const getExpiringProductSuggestions = async (req, res) => {
 
 const getRetailerSuggestions = async (req, res) => {
   try {
+    await maybeGenerate();
+
+    const retailer = await Retailer.findOne({ userId: req.userInfo.userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer profile not found" });
+    }
+
     const suggestions = await SuggestedPurchase.find({
-      retailerId: req.userInfo.userId,
+      retailerId: retailer._id,
     })
       .populate("productId")
       .populate("inventoryId");
@@ -53,9 +82,11 @@ const getRetailerSuggestions = async (req, res) => {
     res.status(200).json({
       success: true,
       suggestions: suggestions.map((s) => ({
-        productName: s.productId.name,
+        suggestionId: s._id.toString(),
+        productName: s.productId?.name ?? "Unknown",
         quantity: s.quantity,
         status: s.status,
+        attempts: s.attempts ?? 1,
         createdAt: s.createdAt,
       })),
     });

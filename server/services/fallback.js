@@ -21,9 +21,9 @@ const fallbackSuggestionHandler = async () => {
     if (newRetailer) {
       suggestion.triedRetailers.push(suggestion.retailerId);
       suggestion.retailerId = newRetailer;
-      suggestion.status = "reassigned";
+      suggestion.status = "pending";
       suggestion.attempts += 1;
-      suggestion.createdAt = new Date(); // reset timer
+      suggestion.createdAt = new Date();
       await suggestion.save();
 
       notifyRetailer(
