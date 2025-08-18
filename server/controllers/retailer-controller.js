@@ -51,6 +51,50 @@ const addSalesData = async (req, res) => {
       });
     }
 
+    // Check if retailer has enough inventory for this product
+    const retailerInventory = await Inventory.find({
+      productId: product._id,
+      assignedRetailer: retailer._id,
+      currentStatus: { $in: ["assigned", "in_inventory"] },
+      quantity: { $gt: 0 },
+    }).sort({ expiryDate: 1 });
+
+    const totalAvailableQuantity = retailerInventory.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+
+    if (totalAvailableQuantity < qty) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient inventory. You have ${totalAvailableQuantity} units available, but trying to sell ${qty} units. Please purchase more inventory first.`,
+        availableQuantity: totalAvailableQuantity,
+        requestedQuantity: qty,
+        productName: product.name,
+      });
+    }
+
+    // Deduct from inventory (FIFO - First In, First Out)
+    let remainingQtyToDeduct = qty;
+    const updatedInventoryItems = [];
+
+    for (const item of retailerInventory) {
+      if (remainingQtyToDeduct <= 0) break;
+
+      const deductAmount = Math.min(item.quantity, remainingQtyToDeduct);
+      item.quantity -= deductAmount;
+      remainingQtyToDeduct -= deductAmount;
+
+      if (item.quantity === 0) {
+        item.currentStatus = "sold";
+      }
+
+      updatedInventoryItems.push(item.save());
+    }
+
+    // Save all inventory updates
+    await Promise.all(updatedInventoryItems);
+
     const effectivePrice =
       priceAtSale != null ? Number(priceAtSale) : Number(product.price);
     const totalAmount = effectivePrice * qty;
@@ -72,6 +116,7 @@ const addSalesData = async (req, res) => {
       success: true,
       message: "Sales data recorded",
       sale: event,
+      inventoryUpdated: true,
     });
   } catch (err) {
     console.error("Add Sales Error:", err);
@@ -324,6 +369,170 @@ const getRetailerSales = async (req, res) => {
   }
 };
 
+const getRetailerInventory = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    console.log(`🔍 Looking for inventory for retailer: ${retailer.retailerName} (ID: ${retailer._id})`);
+
+    const retailerInventory = await Inventory.find({
+      assignedRetailer: retailer._id,
+      currentStatus: { $in: ["assigned", "in_inventory"] },
+      quantity: { $gt: 0 },
+    }).populate("productId");
+
+    console.log(`📦 Found ${retailerInventory.length} inventory items for retailer`);
+
+    const inventorySummary = {};
+    
+    for (const item of retailerInventory) {
+      const productId = item.productId._id.toString();
+      
+      if (!inventorySummary[productId]) {
+        inventorySummary[productId] = {
+          productId: item.productId._id,
+          productName: item.productId.name,
+          totalQuantity: 0,
+          batches: [],
+        };
+      }
+      
+      inventorySummary[productId].totalQuantity += item.quantity;
+      inventorySummary[productId].batches.push({
+        batchId: item.batchId,
+        quantity: item.quantity,
+        expiryDate: item.expiryDate,
+        status: item.currentStatus,
+      });
+    }
+
+    console.log(`📊 Inventory summary:`, Object.keys(inventorySummary).map(key => ({
+      product: inventorySummary[key].productName,
+      quantity: inventorySummary[key].totalQuantity
+    })));
+
+    return res.status(200).json({
+      success: true,
+      inventory: Object.values(inventorySummary),
+    });
+  } catch (err) {
+    console.error("getRetailerInventory error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const fixInventoryAssignments = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    console.log(`🔧 Fixing inventory assignments for retailer: ${retailer.retailerName}`);
+
+    // Get all purchases for this retailer
+    const purchases = await Purchase.find({ retailerId: retailer._id });
+    console.log(`📋 Found ${purchases.length} purchases for retailer`);
+
+    let fixedCount = 0;
+    const results = [];
+
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        const product = await Product.findById(order.productId);
+        if (!product) continue;
+
+        // Check if retailer already has inventory for this product
+        const existingInventory = await Inventory.find({
+          productId: order.productId,
+          assignedRetailer: retailer._id,
+          currentStatus: { $in: ["assigned", "in_inventory"] },
+        });
+
+        const totalExistingQuantity = existingInventory.reduce((sum, item) => sum + item.quantity, 0);
+
+        if (totalExistingQuantity < order.quantity) {
+          // Need to create additional inventory
+          const neededQuantity = order.quantity - totalExistingQuantity;
+          
+          // Find available unassigned inventory
+          const availableInventory = await Inventory.find({
+            productId: order.productId,
+            currentStatus: "in_inventory",
+            assignedRetailer: null,
+            quantity: { $gt: 0 },
+          }).sort({ expiryDate: 1 });
+
+          let qtyToAssign = neededQuantity;
+          for (const item of availableInventory) {
+            if (qtyToAssign <= 0) break;
+
+            const assignAmount = Math.min(item.quantity, qtyToAssign);
+            
+            // Reduce the original inventory
+            item.quantity -= assignAmount;
+            if (item.quantity === 0) {
+              item.currentStatus = "sold";
+            }
+            await item.save();
+
+            // Create new inventory for retailer
+            const newInventoryItem = new Inventory({
+              productId: item.productId,
+              batchId: item.batchId,
+              price: item.price,
+              quantity: assignAmount,
+              expiryDate: item.expiryDate,
+              currentStatus: "assigned",
+              assignedRetailer: retailer._id,
+              imageUrl: item.imageUrl,
+            });
+            
+            await newInventoryItem.save();
+            qtyToAssign -= assignAmount;
+            fixedCount++;
+          }
+
+          results.push({
+            product: product.name,
+            requested: order.quantity,
+            existing: totalExistingQuantity,
+            fixed: neededQuantity - qtyToAssign,
+          });
+        }
+      }
+    }
+
+    console.log(`✅ Fixed ${fixedCount} inventory items for retailer`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Fixed ${fixedCount} inventory assignments`,
+      results,
+    });
+  } catch (err) {
+    console.error("fixInventoryAssignments error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 module.exports = {
   addSalesData,
   getAvailableProducts,
@@ -332,4 +541,6 @@ module.exports = {
   getRetailersWithStats,
   getRetailerSales,
   getRetailerSalesSummary,
+  getRetailerInventory,
+  fixInventoryAssignments,
 };

@@ -163,9 +163,14 @@ const AddSales = () => {
       const data = await res.json();
 
       if (data.success) {
-        alert(`Recorded: Sold ${quantity} x ${match.name}`);
+        alert(`✅ Recorded: Sold ${quantity} x ${match.name}`);
       } else {
-        alert(`Failed: ${data.message}`);
+        // Handle insufficient inventory error specifically
+        if (data.availableQuantity !== undefined) {
+          alert(`❌ ${data.message}\n\nYou need to purchase ${data.requestedQuantity - data.availableQuantity} more units of ${data.productName} to complete this sale.`);
+        } else {
+          alert(`❌ Failed: ${data.message}`);
+        }
       }
     } catch (err) {
       console.error("Submit error", err);
@@ -263,7 +268,12 @@ const AddSales = () => {
         )}
       </div>
 
-      {retailerId && <RetailerSalesPanels retailerId={retailerId} />}
+      {retailerId && (
+        <>
+          <RetailerInventoryPanel retailerId={retailerId} />
+          <RetailerSalesPanels retailerId={retailerId} />
+        </>
+      )}
     </div>
   );
 };
@@ -285,18 +295,80 @@ function MicIcon({ listening }) {
 }
 
 function ConfirmCard({ quantity, match, onConfirm, onCancel }) {
+  const [inventoryInfo, setInventoryInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInventoryInfo = async () => {
+      try {
+        setLoading(true);
+        const res = await authorizedFetch("/api/retailer/inventory");
+        const data = await res.json();
+        if (data.success) {
+          const productInventory = data.inventory.find(
+            item => item.productName === match?.name
+          );
+          setInventoryInfo(productInventory);
+        }
+      } catch (e) {
+        console.error("Failed to fetch inventory info", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (match) {
+      fetchInventoryInfo();
+    }
+  }, [match]);
+
+  const hasEnoughInventory = inventoryInfo && inventoryInfo.totalQuantity >= quantity;
+  const isLowStock = inventoryInfo && inventoryInfo.totalQuantity < 5;
+
   return (
     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
       <p className="text-gray-700 text-lg">
         ✅ Confirm: Sold <strong>{quantity}</strong> ×{" "}
         <strong>{match?.name}</strong>?
       </p>
+      
+      {loading ? (
+        <p className="text-sm text-gray-600 mt-2">Checking inventory...</p>
+      ) : inventoryInfo ? (
+        <div className="mt-3 p-3 bg-white rounded border">
+          <p className="text-sm font-medium mb-2">📦 Inventory Status:</p>
+          <div className="flex items-center gap-2">
+            <span className={`text-sm ${
+              hasEnoughInventory ? "text-green-600" : "text-red-600"
+            }`}>
+              Available: {inventoryInfo.totalQuantity} units
+            </span>
+            {hasEnoughInventory && (
+              <span className="text-xs text-green-600">✓ Sufficient stock</span>
+            )}
+            {!hasEnoughInventory && (
+              <span className="text-xs text-red-600">✗ Insufficient stock</span>
+            )}
+            {isLowStock && hasEnoughInventory && (
+              <span className="text-xs text-yellow-600">⚠ Low stock warning</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-red-600 mt-2">⚠ Product not found in your inventory</p>
+      )}
+      
       <div className="mt-4 flex gap-3">
         <button
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+          className={`px-4 py-2 rounded-md text-white ${
+            hasEnoughInventory 
+              ? "bg-green-600 hover:bg-green-700" 
+              : "bg-red-600 hover:bg-red-700 cursor-not-allowed"
+          }`}
           onClick={onConfirm}
+          disabled={!hasEnoughInventory}
         >
-          Yes, Confirm
+          {hasEnoughInventory ? "Yes, Confirm" : "Insufficient Stock"}
         </button>
         <button
           className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-md"
@@ -601,6 +673,129 @@ function RetailerSalesSummary({ retailerId, from, to, productId }) {
           </tr>
         </tfoot>
       </table>
+    </div>
+  );
+}
+
+function RetailerInventoryPanel({ retailerId }) {
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const res = await authorizedFetch("/api/retailer/inventory");
+      const data = await res.json();
+      if (data.success) {
+        setInventory(data.inventory);
+      }
+    } catch (e) {
+      console.error("Failed to fetch retailer inventory", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+  }, [retailerId]);
+
+  if (loading) {
+    return (
+      <div className="p-6 border rounded-2xl shadow-sm bg-white max-w-5xl">
+        <div className="text-sm text-gray-500">Loading inventory...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 border rounded-2xl shadow-sm bg-white max-w-5xl">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <span>📦</span> My Inventory
+        </h2>
+        <button
+          onClick={async () => {
+            try {
+              const res = await authorizedFetch("/api/retailer/fix-inventory", {
+                method: "POST",
+              });
+              const data = await res.json();
+              if (data.success) {
+                alert(`✅ ${data.message}`);
+                fetchInventory(); // Refresh the inventory display
+              } else {
+                alert(`❌ ${data.message}`);
+              }
+            } catch (e) {
+              console.error("Failed to fix inventory", e);
+              alert("Failed to fix inventory assignments");
+            }
+          }}
+          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+        >
+          🔧 Fix Inventory
+        </button>
+      </div>
+
+      {inventory.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-lg mb-2">No inventory available</p>
+          <p className="text-sm">You need to purchase products before you can sell them.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-3 text-left">Product</th>
+                <th className="p-3 text-right">Available Qty</th>
+                <th className="p-3 text-left">Batches</th>
+                <th className="p-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventory.map((item, i) => (
+                <tr key={item.productId} className={i % 2 ? "bg-white" : "bg-gray-50"}>
+                  <td className="p-3 font-medium">{item.productName}</td>
+                  <td className="p-3 text-right">
+                    <span className={`font-bold ${
+                      item.totalQuantity > 10 ? "text-green-600" : 
+                      item.totalQuantity > 5 ? "text-yellow-600" : "text-red-600"
+                    }`}>
+                      {item.totalQuantity}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="space-y-1">
+                      {item.batches.map((batch, idx) => (
+                        <div key={idx} className="text-xs text-gray-600">
+                          Batch {batch.batchId}: {batch.quantity} units
+                          {batch.expiryDate && (
+                            <span className="ml-2 text-gray-500">
+                              (Expires: {new Date(batch.expiryDate).toLocaleDateString()})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      item.totalQuantity > 10 ? "bg-green-100 text-green-800" :
+                      item.totalQuantity > 5 ? "bg-yellow-100 text-yellow-800" :
+                      "bg-red-100 text-red-800"
+                    }`}>
+                      {item.totalQuantity > 10 ? "Well Stocked" :
+                       item.totalQuantity > 5 ? "Low Stock" : "Critical"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,14 @@ const Product = require("../../database/models/product-model");
 
 const addProducts = async (req, res) => {
   try {
-    const { name, category, price, batches } = req.body;
+    const { name, category, price, batches, imageUrl } = req.body;
+    console.log("Received product data:", {
+      name,
+      category,
+      price,
+      batches,
+      imageUrl,
+    });
 
     if (
       !name ||
@@ -44,6 +51,7 @@ const addProducts = async (req, res) => {
       category,
       price: parsedPrice,
       batches,
+      imageUrl,
     });
 
     res.status(201).json({ message: "Product created", data: newProduct });

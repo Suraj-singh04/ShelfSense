@@ -13,6 +13,7 @@ const purchaseRoutes = require("./routes/purchase");
 const smartRoutingRoutes = require("./routes/smart-routing");
 const assignToRetailerRoutes = require("./routes/assignToRetailer");
 const suggestionRoutes = require("./routes/suggestions");
+const uploadRoute = require("./routes/upload");
 
 const runSmartRoutingScheduler = require("./scheduler");
 // const clearAllData = require("../database/temp");
@@ -31,13 +32,13 @@ const corsOptions = {
   ],
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
 
 app.use(express.json());
-
+app.use("/api/upload", uploadRoute);
 app.use("/api/products", products);
 
 app.use("/api/auth", authRoutes);

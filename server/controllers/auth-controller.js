@@ -5,7 +5,15 @@ const jwt = require("jsonwebtoken");
 //register controller
 const register = async (req, res) => {
   try {
-    const { username, email, password, role, address, name, mobile } = req.body;
+    const {
+      username,
+      email,
+      password,
+      role = "retailer",
+      address,
+      name,
+      mobileNumber,
+    } = req.body;
 
     // Check if user already exists
     const checkExistingUser = await User.findOne({
@@ -20,10 +28,17 @@ const register = async (req, res) => {
     }
 
     // Validate required fields
-    if (!username || !email || !password || !mobile) {
+    if (
+      !username ||
+      !email ||
+      !password ||
+      !mobileNumber ||
+      (role === "retailer" && !address)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Username, email, and password are required.",
+        message:
+          "Username, email, password, mobile number and address are required.",
       });
     }
 
@@ -31,30 +46,28 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create a new user and save it in database
+    // Create and save new user
     const newUser = new User({
       username,
       email,
       password: hashedPassword,
-      role: role || "retailer",
+      role,
       name: name || username,
-      mobileNumber: mobile,
+      mobileNumber,
+      address: role === "retailer" ? address : undefined,
     });
-
-    if ((role || "retailer") === "retailer" && address) {
-      newUser.address = address;
-    }
 
     await newUser.save();
 
-    if (role === "retailer" && address) {
+    // If retailer, create a Retailer profile
+    if (role === "retailer") {
       const Retailer = require("../../database/models/retailer-model");
       await Retailer.create({
         name: name || username,
-        email: email,
-        address: address,
+        email,
+        address,
         salesData: [],
-        mobileNumber: mobile,
+        mobileNumber,
         userId: newUser._id,
       });
     }
@@ -70,7 +83,7 @@ const register = async (req, res) => {
       },
     });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     res.status(500).json({
       success: false,
       message: "Some error occurred!",
@@ -91,7 +104,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Check if user exists (allow login with email or username)
     const user = await User.findOne({
       $or: [{ username }, { email: username }],
     });
@@ -148,4 +160,47 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login, register };
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.userInfo.userId;
+
+    const { oldPassword, newPassword } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(500).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Old password is not correct! Please try again.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const newHashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = newHashedPassword;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changes successfully",
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({
+      success: false,
+      message: "Some error occurred!",
+    });
+  }
+};
+
+module.exports = { login, register, changePassword };

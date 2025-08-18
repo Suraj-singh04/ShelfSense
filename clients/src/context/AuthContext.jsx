@@ -1,6 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
-const AuthContext = createContext();
+const AuthContext = createContext({
+  user: null,
+  token: null,
+  login: async () => {},
+  signup: async () => {},
+  logout: () => {},
+  loading: true,
+});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -20,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async ({ username, password }) => {
+    setLoading(true);
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
@@ -41,6 +49,8 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("Login error:", error);
       return { success: false, error: "Network or server error" };
+    } finally {
+      setLoading(false);
     }
   };
 

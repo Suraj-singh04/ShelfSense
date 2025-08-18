@@ -9,6 +9,7 @@ import {
   FaStore,
   FaUserShield,
 } from "react-icons/fa";
+import { Link } from "react-router-dom";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,7 +18,7 @@ const Login = () => {
     password: "",
     name: "",
     role: "retailer",
-    location: "",
+    address: "",
     mobile: "",
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -49,8 +50,8 @@ const Login = () => {
         setError("Mobile number is required");
         return false;
       }
-      if (formData.role === "retailer" && !formData.location) {
-        setError("Location is required for retailers");
+      if (formData.role === "retailer" && !formData.address) {
+        setError("Address is required for retailers");
         return false;
       }
     }
@@ -93,11 +94,12 @@ const Login = () => {
           password: formData.password,
           name: formData.name,
           role: formData.role,
-          address: formData.role === "retailer" ? formData.location : undefined,
-          mobile: formData.mobile,
+          address: formData.role === "retailer" ? formData.address : undefined,
+          mobileNumber: formData.mobile,
         };
         result = await signup(signupData);
       }
+      console.log(formData);
 
       if (result.success) {
         // Redirect based on role
@@ -125,7 +127,7 @@ const Login = () => {
       password: "",
       name: "",
       role: "retailer",
-      location: "",
+      address: "",
       mobile: "",
     });
   };
@@ -238,16 +240,16 @@ const Login = () => {
                 {formData.role === "retailer" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Store Location *
+                      Address *
                     </label>
                     <input
                       type="text"
-                      name="location"
-                      value={formData.location}
+                      name="address"
+                      value={formData.address}
                       onChange={handleInputChange}
                       required={!isLogin && formData.role === "retailer"}
                       className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Enter store location"
+                      placeholder="Enter address"
                     />
                   </div>
                 )}
@@ -291,6 +293,14 @@ const Login = () => {
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
+              </div>
+              <div className="flex justify-end mt-2">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-teal-600 hover:underline focus:outline-none focus:ring-2 focus:ring-teal-400"
+                >
+                  Forgot password?
+                </Link>
               </div>
             </div>
 

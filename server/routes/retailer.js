@@ -8,6 +8,8 @@ const {
   getRetailersWithStats,
   getRetailerSalesSummary,
   getRetailerSales,
+  getRetailerInventory,
+  fixInventoryAssignments,
 } = require("../controllers/retailer-controller");
 const authMiddleware = require("../middleware/auth-middleware");
 
@@ -18,6 +20,8 @@ router.get("/stats", authMiddleware, getRetailersWithStats);
 router.get("/get", getAllRetailers);
 router.get("/sales/summary", authMiddleware, getRetailerSalesSummary);
 router.get("/sales/data", authMiddleware, getRetailerSales);
+router.get("/inventory", authMiddleware, getRetailerInventory);
+router.post("/fix-inventory", authMiddleware, fixInventoryAssignments);
 
 
 module.exports = router;

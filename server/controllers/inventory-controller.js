@@ -42,6 +42,7 @@ const addToInventory = async (req, res) => {
       expiryDate: expiryToUse,
       currentStatus: "in_inventory",
       assignedRetailer: null,
+      imageUrl: product.imageUrl,
     });
 
     await refreshSmartSuggestion(productId, inventoryItem._id);
@@ -65,6 +66,11 @@ const getAllInventoryItems = async (req, res) => {
     const grouped = {};
 
     inventory.forEach((item) => {
+      if (!item.productId) {
+        console.warn("Skipping inventory with missing product:", item._id);
+        return; // skip orphaned inventory records
+      }
+
       const id = item.productId._id.toString();
 
       if (!grouped[id]) {
@@ -72,6 +78,7 @@ const getAllInventoryItems = async (req, res) => {
           _id: id,
           name: item.productId.name,
           price: item.price,
+          imageUrl: item.productId.imageUrl,
           totalQuantity: 0,
           batches: [],
           arrivalDate: item.addedDate,
@@ -97,6 +104,7 @@ const getAllInventoryItems = async (req, res) => {
       .json({ success: false, message: "Failed to fetch inventory" });
   }
 };
+
 
 module.exports = {
   addToInventory,

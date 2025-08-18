@@ -18,6 +18,7 @@ const inventorySchema = new mongoose.Schema({
     enum: ["in_inventory", "assigned", "sold", "expired"],
     default: "in_inventory",
   },
+  imageUrl: String,
   assignedRetailer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Retailer",

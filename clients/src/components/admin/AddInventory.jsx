@@ -1,18 +1,74 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { authorizedFetch } from "../../utils/api";
-import { FaPlus } from "react-icons/fa";
+import { FaPlus, FaSpinner, FaBoxes, FaClipboardList } from "react-icons/fa";
+import toast, { Toaster } from "react-hot-toast";
 
-const AddInventory = ({ products = [], inventory }) => {
+// Format date for <input type="date" />
+const toDateInputValue = (date) => {
+  if (!date) return "";
+  const dt = new Date(date);
+  return Number.isNaN(dt.getTime()) ? "" : dt.toISOString().substring(0, 10);
+};
+
+// Get batch list for selected product
+const getBatchesForProduct = (productId, products = []) => {
+  if (!productId) return [];
+  const product = products.find((p) => p._id === productId);
+  if (!product || !Array.isArray(product.batches)) return [];
+  return product.batches.map((b) => ({
+    batchId: b.batchId,
+    expiryDate: b.expiryDate,
+  }));
+};
+
+const AddInventory = ({ products = [], inventory = [] }) => {
   const [productId, setProductId] = useState("");
   const [batchId, setBatchId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [arrivalDate, setArrivalDate] = useState("");
-  const [message, setMessage] = useState("");
-  console.log(inventory);
+  const [loading, setLoading] = useState(false);
+
+  const batchOptions = useMemo(
+    () => getBatchesForProduct(productId, products),
+    [productId, products]
+  );
+
+  useEffect(() => {
+    if (!productId) {
+      setBatchId("");
+      setExpiryDate("");
+      return;
+    }
+    if (batchOptions.length === 1) {
+      setBatchId(batchOptions[0].batchId);
+      setExpiryDate(toDateInputValue(batchOptions[0].expiryDate));
+    } else {
+      setBatchId("");
+      setExpiryDate("");
+    }
+  }, [productId, batchOptions]);
+
+  useEffect(() => {
+    if (!batchId) {
+      setExpiryDate("");
+      return;
+    }
+    const selected = batchOptions.find((b) => b.batchId === batchId);
+    if (selected?.expiryDate) {
+      setExpiryDate(toDateInputValue(selected.expiryDate));
+    }
+  }, [batchId, batchOptions]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("⏳ Adding inventory...");
+    if (!productId || !batchId || !quantity) {
+      toast.error("Please fill in product, batch and quantity.");
+      return;
+    }
+
+    setLoading(true);
+    const t = toast.loading("Adding inventory...");
 
     try {
       const res = await authorizedFetch("/api/inventory/add", {
@@ -27,54 +83,60 @@ const AddInventory = ({ products = [], inventory }) => {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      toast.dismiss(t);
+
       if (res.ok) {
-        setMessage("✅ Inventory added successfully!");
-        setProductId("");
+        toast.success("Inventory added successfully!");
         setBatchId("");
         setQuantity("");
         setExpiryDate("");
         setArrivalDate("");
       } else {
-        setMessage(`❌ ${data.message}`);
+        toast.error(data?.message || "Failed to add inventory.");
       }
     } catch (err) {
       console.error(err);
-      setMessage("❌ Error adding inventory.");
+      toast.dismiss(t);
+      toast.error("Error adding inventory.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (!batchId || !productId) return;
-
-    const selectedProduct = inventory.find((item) => item._id === productId);
-    const selectedBatch = selectedProduct?.batches?.find(
-      (b) => b.batchId === batchId
-    );
-
-    if (selectedBatch?.expiry) {
-      setExpiryDate(selectedBatch.expiry.substring(0, 10));
-    }
-  }, [batchId, productId, inventory]);
-
   return (
-    <div className="p-6 space-y-8">
-      {/* Form Box */}
-      <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-200">
-        <h2 className="text-xl font-bold mb-4">📦 Add Inventory</h2>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white p-8">
+      <Toaster position="top-right" />
+
+      {/* HEADER */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-green-400 drop-shadow-lg flex items-center justify-center gap-2">
+          <FaBoxes /> Inventory Manager
+        </h1>
+        <p className="text-gray-400 mt-2">
+          Manage and track your product stock with ease ✨
+        </p>
+      </div>
+
+      {/* GRID: Form + Inventory List */}
+      <div className="grid grid-cols-[350px,1fr] gap-8">
+        {/* LEFT: FORM */}
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"
+          whileHover={{ scale: 2 }}
+          className="bg-gray-900/70 border border-gray-700 rounded-2xl shadow-lg p-6 mb-10 backdrop-blur-md transition-all duration-300 space-y-4"
         >
-          {/* Select Product Dropdown */}
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-purple-400">
+            <FaPlus /> Add Inventory
+          </h2>
+
+          {/* Product */}
           <div className="flex flex-col">
-            <label className="mb-1 font-medium text-gray-700">
-              🧾 Select Product
-            </label>
+            <label className="mb-1 text-gray-300">🧾 Select Product</label>
             <select
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
-              className="p-3 border rounded-lg shadow-sm"
+              className="p-3 rounded-lg bg-[#111] border border-gray-700 text-gray-200 hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
               required
             >
               <option value="">-- Choose a product --</option>
@@ -85,124 +147,151 @@ const AddInventory = ({ products = [], inventory }) => {
               ))}
             </select>
           </div>
+
+          {/* Batch */}
           <div className="flex flex-col">
-            <label className="mb-1 font-medium text-gray-700">
-              🧪 Enter or Select Batch ID
-            </label>
-            <input
-              type="text"
-              list="batch-suggestions"
+            <label className="mb-1 text-gray-300">🧪 Select Batch</label>
+            <select
               value={batchId}
               onChange={(e) => setBatchId(e.target.value)}
-              placeholder="Enter new or existing batch ID"
-              className="p-3 border rounded-lg shadow-sm"
+              className="p-3 rounded-lg bg-[#111] border border-gray-700 text-gray-200 hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+              disabled={batchOptions.length === 0}
               required
-            />
-            <datalist id="batch-suggestions">
-              {(
-                inventory.find((item) => item._id === productId)?.batches || []
-              ).map((batch) => (
-                <option key={batch.batchId} value={batch.batchId} />
+            >
+              <option value="">
+                {batchOptions.length === 0
+                  ? "No batches available"
+                  : "-- Choose a batch --"}
+              </option>
+              {batchOptions.map((b) => (
+                <option key={b.batchId} value={b.batchId}>
+                  {b.batchId}
+                </option>
               ))}
-            </datalist>
+            </select>
           </div>
 
           {/* Quantity */}
           <div className="flex flex-col">
-            <label className="mb-1 font-medium text-gray-700">
-              📦 Quantity
-            </label>
+            <label className="mb-1 text-gray-300">📦 Quantity</label>
             <input
               type="number"
               value={quantity}
-              placeholder="Enter Quantity"
               onChange={(e) => setQuantity(e.target.value)}
-              className="p-3 border rounded-lg shadow-sm"
+              placeholder="Enter quantity"
+              className="p-3 rounded-lg bg-[#111] border border-gray-700 text-gray-200 hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+              min={1}
               required
             />
           </div>
 
-          {/* Expiry Date */}
+          {/* Expiry */}
           <div className="flex flex-col">
-            <label className="mb-1 font-medium text-gray-700">
-              ⏳ Expiry Date
-            </label>
+            <label className="mb-1 text-gray-300">⏳ Expiry Date</label>
             <input
               type="date"
               value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              className="p-3 border rounded-lg shadow-sm"
+              readOnly
+              className="p-3 rounded-lg bg-[#111] border border-gray-700 text-gray-400 cursor-not-allowed"
+            />
+          </div>
+
+          {/* Arrival */}
+          <div className="flex flex-col">
+            <label className="mb-1 text-gray-300">📅 Arrival Date</label>
+            <input
+              type="date"
+              value={arrivalDate}
+              onChange={(e) => setArrivalDate(e.target.value)}
+              className="p-3 rounded-lg bg-[#111] border border-gray-700 text-gray-200 hover:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
               required
             />
           </div>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <button
             type="submit"
-            className="col-span-1 md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow flex items-center justify-center gap-2 transition-all duration-300"
+            disabled={loading}
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all duration-300"
           >
-            <FaPlus /> Add Inventory
+            {loading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                <span>Adding...</span>
+              </>
+            ) : (
+              <>
+                <FaPlus />
+                <span>Add Inventory</span>
+              </>
+            )}
           </button>
         </form>
 
-        {/* Feedback Message */}
-        {message && <p className="text-sm text-center">🔔 {message}</p>}
-      </div>
-
-      {/* Inventory Table */}
-      <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-200">
-        <h3 className="text-xl font-bold mb-6 text-blue-700 flex items-center gap-2">
-          📋 Inventory List
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm text-gray-700 border-collapse rounded-lg overflow-hidden">
-            <thead className="bg-blue-100 text-blue-900 text-left uppercase text-xs sticky top-0 z-10">
-              <tr>
-                <th className="p-4">🆔 ID</th>
-                <th className="p-4">📦 Product</th>
-                <th className="p-4">🔢 Batch</th>
-                <th className="p-4">⏳ Expiry</th>
-                <th className="p-4">📅 Arrival</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {inventory.length > 0 ? (
-                inventory.map((item, index) => (
-                  <tr
-                    key={item._id}
-                    className={`transition-all hover:bg-blue-50 ${
-                      index % 2 === 0 ? "bg-gray-50" : "bg-white"
-                    }`}
-                  >
-                    <td className="p-4 font-mono text-xs text-gray-600">
-                      {item._id}
-                    </td>
-                    <td className="p-4 font-medium">{item.name}</td>
-                    <td className="p-4">{item.batches[0]?.batchId || "N/A"}</td>
-                    <td className="p-4">
-                      {item.batches[0]?.expiry
-                        ? new Date(item.batches[0].expiry).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-                    <td className="p-4">
-                      {item.arrivalDate
-                        ? new Date(item.arrivalDate).toLocaleDateString()
-                        : "N/A"}
+        {/* RIGHT: INVENTORY LIST */}
+        <div
+          whileHover={{ scale: 1.005 }}
+          className="bg-gray-900/70 border border-gray-700 rounded-2xl shadow-lg p-6 backdrop-blur-md"
+        >
+          <h3 className="text-xl font-semibold flex items-center gap-2 text-green-400 mb-4">
+            <FaClipboardList /> Inventory List
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-gray-300">
+              <thead className="bg-[#111] text-gray-400 uppercase text-xs">
+                <tr>
+                  <th className="p-4">🆔 ID</th>
+                  <th className="p-4">📦 Product</th>
+                  <th className="p-4">🔢 Batches</th>
+                  <th className="p-4">⏳ Expiries</th>
+                  <th className="p-4">📅 Arrival</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {Array.isArray(inventory) && inventory.length > 0 ? (
+                  inventory.map((item, index) => (
+                    <tr
+                      key={item._id}
+                      className={`transition-all duration-200 hover:bg-purple-900/20 ${
+                        index % 2 === 0 ? "bg-[#151515]" : "bg-[#1f1f22]"
+                      }`}
+                    >
+                      <td className="p-4 font-mono text-xs text-gray-500">
+                        {item._id}
+                      </td>
+                      <td className="p-4 font-medium">{item.name}</td>
+                      <td className="p-4">
+                        {item.batches.map((b) => b.batchId).join(", ")}
+                      </td>
+                      <td className="p-4">
+                        {item.batches
+                          .map((b) =>
+                            b.expiryDate
+                              ? new Date(b.expiryDate).toLocaleDateString()
+                              : "N/A"
+                          )
+                          .join(", ")}
+                      </td>
+                      <td className="p-4">
+                        {item.arrivalDate
+                          ? new Date(item.arrivalDate).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="5"
+                      className="text-center text-gray-500 p-6 italic bg-[#151515]"
+                    >
+                      No inventory found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan="5"
-                    className="text-center text-gray-500 p-6 italic bg-gray-50"
-                  >
-                    No inventory found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

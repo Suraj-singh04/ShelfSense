@@ -3,6 +3,8 @@ import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import RetailerDashboard from "./pages/RetailerDashboard";
+import ForgotPassword from "./pages/ForgotPassword";
+import ChangePassword from "./pages/ResetPassword";
 
 const App = () => {
   const { currentUser } = useAuth();
@@ -24,6 +26,9 @@ const App = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/admin-dashboard/*" element={<AdminDashboard />} />
       <Route path="/retailer-dashboard/*" element={<RetailerDashboard />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ChangePassword />} />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

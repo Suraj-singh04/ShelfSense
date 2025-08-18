@@ -52,10 +52,10 @@ const RetailerDashboard = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f9fafb]">
+    <div className="flex min-h-screen bg-blue-50">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 pt-6 px-4 bg-white border-r z-30 shadow-md transform transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 h-screen w-64 pt-6 px-4 bg-blue-50 border-r z-30 shadow-md transform transition-transform duration-300 ease-in-out
     ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} 
     md:translate-x-0 md:static md:shadow-none`}
       >
@@ -105,8 +105,8 @@ const RetailerDashboard = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-y-auto">
         {/* Header */}
-        <header className="bg-white sticky top-0 z-40 shadow-sm border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
+        <header className="bg-blue-50 sticky top-0 z-40 shadow-sm border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between ">
             {/* Mobile Sidebar Toggle */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -116,7 +116,7 @@ const RetailerDashboard = () => {
             </button>
 
             {/* Branding and Welcome Message */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex flex-col  sm:flex-row sm:items-center gap-2">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
                   RetailPro
