@@ -1,0 +1,1861 @@
+I would also like you to have a look at the controllers to have a great idea of everything........................................const Product = require("../../database/models/product-model");
+const Inventory = require("../../database/models/inventory-model");
+const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
+
+const assignRetailersToExpiringProducts = async (req, res) => {
+  try {
+    const thresholdDays = 10;
+    const thresholdDate = new Date(
+      Date.now() + thresholdDays * 24 * 60 * 60 * 1000
+    );
+
+    // Get products that are expiring soon
+    const expiringProducts = await Product.find({
+      expiryDate: { $lte: thresholdDate },
+    });
+
+    const results = [];
+
+    for (const product of expiringProducts) {
+      // Get available inventory for this product
+      const availableInventories = await Inventory.find({
+        productId: product._id,
+        assignedRetailer: null,
+        currentStatus: "in_inventory",
+      });
+
+      if (availableInventories.length === 0) continue;
+
+      const existingSuggestion = await SuggestedPurchase.findOne({
+        productId: product._id,
+        status: "pending",
+      });
+
+      if (existingSuggestion) {
+        console.log(`Skipping ${product.name}, already has a suggestion.`);
+        continue;
+      }
+
+      // Get best retailer suggestion
+      const suggestion = await getSmartRoutingSuggestion(product._id);
+      if (!suggestion.suggestedRetailer?.id) continue;
+
+      // Assign each inventory item to suggested retailer
+      for (const item of availableInventories) {
+        item.assignedRetailer = suggestion.suggestedRetailer.id;
+        item.currentStatus = "assigned";
+        await item.save();
+      }
+
+      results.push({
+        product: {
+          id: product._id,
+          name: product.name,
+        },
+        assignedTo: suggestion.suggestedRetailer.name,
+        itemsAssigned: availableInventories.length,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Retailers assigned to expiring products",
+      results,
+    });
+  } catch (error) {
+    console.error("Auto-assign error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+module.exports = {
+  assignRetailersToExpiringProducts,
+};
+const User = require("../../database/models/register-model");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+//register controller
+const register = async (req, res) => {
+  try {
+    const {
+      username,
+      email,
+      password,
+      role = "retailer",
+      address,
+      name,
+      mobileNumber,
+    } = req.body;
+
+    // Check if user already exists
+    const checkExistingUser = await User.findOne({
+      $or: [{ username }, { email }],
+    });
+
+    if (checkExistingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists, try with a different username or email.",
+      });
+    }
+
+    // Validate required fields
+    if (
+      !username ||
+      !email ||
+      !password ||
+      !mobileNumber ||
+      (role === "retailer" && !address)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Username, email, password, mobile number and address are required.",
+      });
+    }
+
+    // Hash user password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create and save new user
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+      role,
+      name: name || username,
+      mobileNumber,
+      address: role === "retailer" ? address : undefined,
+    });
+
+    await newUser.save();
+
+    // If retailer, create a Retailer profile
+    if (role === "retailer") {
+      const Retailer = require("../../database/models/retailer-model");
+      await Retailer.create({
+        name: name || username,
+        email,
+        address,
+        salesData: [],
+        mobileNumber,
+        userId: newUser._id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      success: false,
+      message: "Some error occurred!",
+    });
+  }
+};
+
+//login controller
+const login = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validate required fields
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Username and password are required.",
+      });
+    }
+
+    const user = await User.findOne({
+      $or: [{ username }, { email: username }],
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User doesn't exist",
+      });
+    }
+
+    // Check if password is correct
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    // Create user token
+    const accessToken = jwt.sign(
+      {
+        userId: user._id,
+        username: user.username,
+        role: user.role,
+      },
+      process.env.JWT_SECRET_KEY,
+      {
+        expiresIn: "24h",
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Logged in successfully as ${user.username}`,
+      accessToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+      userId: user._id,
+      role: user.role,
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({
+      success: false,
+      message: "Some error occurred!",
+    });
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.userInfo.userId;
+
+    const { oldPassword, newPassword } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(500).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Old password is not correct! Please try again.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const newHashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = newHashedPassword;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changes successfully",
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({
+      success: false,
+      message: "Some error occurred!",
+    });
+  }
+};
+
+module.exports = { login, register, changePassword };
+const Cart = require("../../database/models/cart-model");
+const Product = require("../../database/models/product-model");
+
+const Retailer = require("../../database/models/retailer-model");
+
+const addToCart = async (req, res) => {
+  try {
+    const { productId, quantity } = req.body;
+    const userId = req.userInfo?.userId;
+
+    // Find retailer
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    // Find product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    // Get or create cart
+    let cart = await Cart.findOne({ retailerId: retailer._id });
+    if (!cart) {
+      cart = await Cart.create({
+        retailerId: retailer._id,
+        items: [],
+      });
+    }
+
+    // Check if product already in cart
+    const existingItem = cart.items.find(
+      (i) => i.productId.toString() === productId
+    );
+
+    if (existingItem) {
+      existingItem.quantity += Number(quantity);
+    } else {
+      cart.items.push({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.imageUrl, // check field name in your Product schema
+        quantity: Number(quantity),
+      });
+    }
+
+    await cart.save();
+
+    // Calculate total
+    const total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+    res.json({
+      success: true,
+      message: "Item added to cart",
+      cart: {
+        ...cart.toObject(),
+        total: total + cart.shippingCost,
+      },
+    });
+  } catch (err) {
+    console.error("❌ addToCart error:", err);
+    res.status(500).json({ success: false, error: "Failed to add to cart" });
+  }
+};
+
+const getCart = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+    let cart = await Cart.findOne({ retailerId: retailer._id });
+
+    if (!cart) {
+      cart = await Cart.create({ retailerId: retailer._id, items: [] });
+    }
+
+    const total = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+    res.json({
+      success: true,
+      data: {
+        ...cart.toObject(),
+        total: total + cart.shippingCost,
+      },
+    });
+  } catch (err) {
+    console.error("❌ getCart error:", err);
+    res.status(500).json({ error: "Failed to fetch cart" });
+  }
+};
+
+const updateQuantity = async (req, res) => {
+  try {
+    const { productId, action } = req.body;
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    let cart = await Cart.findOne({ retailerId: retailer._id });
+    if (!cart) return res.status(404).json({ error: "Cart not found" });
+
+    const item = cart.items.find((i) => i.productId.toString() === productId);
+
+    if (!item) return res.status(404).json({ error: "Item not in cart" });
+
+    if (action === "increase") {
+      item.quantity += 1;
+    } else if (action === "decrease") {
+      item.quantity = Math.max(1, item.quantity - 1);
+    } else if (action === "remove") {
+      cart.items = cart.items.filter(
+        (i) => i.productId.toString() !== productId
+      );
+    }
+
+    await cart.save();
+
+    const total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+    res.json({
+      success: true,
+      data: {
+        ...cart.toObject(),
+        total: total + cart.shippingCost,
+      },
+    });
+  } catch (err) {
+    console.error("❌ updateQuantity error:", err);
+    res.status(500).json({ error: "Failed to update cart" });
+  }
+};
+
+const applyPromo = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    let cart = await Cart.findOne({ retailerId: retailer._id });
+    if (!cart) return res.status(404).json({ error: "Cart not found" });
+
+    let discount = 0;
+    if (code === "DISCOUNT10") discount = 0.1; // 10% off
+    else if (code === "FREESHIP") {
+      cart.shippingCost = 0;
+    } else {
+      return res.status(400).json({ error: "Invalid promo code" });
+    }
+
+    cart.promoCode = code;
+    await cart.save();
+
+    const total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const finalTotal = discount > 0 ? total * (1 - discount) : total;
+
+    res.json({
+      success: true,
+      data: {
+        ...cart.toObject(),
+        total: finalTotal + cart.shippingCost,
+      },
+    });
+  } catch (err) {
+    console.error("❌ applyPromo error:", err);
+    res.status(500).json({ error: "Failed to apply promo" });
+  }
+};
+
+module.exports = {
+  addToCart,
+  getCart,
+  updateQuantity,
+  applyPromo,
+};
+const Inventory = require("../../database/models/inventory-model");
+const Product = require("../../database/models/product-model");
+const refreshSmartSuggestion = require("../services/refreshSmartSuggestion");
+
+const addToInventory = async (req, res) => {
+  try {
+    const { productId, quantity, batchId, expiryDate } = req.body;
+
+    if (!productId || !quantity || !batchId) {
+      return res.status(400).json({
+        error: "Missing required fields: productId, quantity, or batchId",
+      });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+
+    let expiryToUse;
+
+    const existingBatch = product.batches.find(
+      (b) => b.batchId === batchId.trim()
+    );
+
+    if (existingBatch) {
+      expiryToUse = existingBatch.expiryDate;
+    } else {
+      if (!expiryDate) {
+        return res
+          .status(400)
+          .json({ error: "Expiry date is required for new batch" });
+      }
+      product.batches.push({ batchId: batchId.trim(), expiryDate });
+      await product.save();
+      expiryToUse = expiryDate;
+    }
+
+    const inventoryItem = await Inventory.create({
+      productId,
+      quantity,
+      batchId: batchId.trim(),
+      price: product.price,
+      expiryDate: expiryToUse,
+      currentStatus: "in_inventory",
+      assignedRetailer: null,
+      imageUrl: product.imageUrl,
+    });
+
+    await refreshSmartSuggestion(productId, inventoryItem._id);
+
+    return res.status(201).json({
+      message: "Inventory added successfully",
+      data: inventoryItem,
+    });
+  } catch (err) {
+    console.error("Inventory Add Error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const getAllInventoryItems = async (req, res) => {
+  try {
+    const inventory = await Inventory.find({
+      currentStatus: "in_inventory",
+    }).populate("productId");
+
+    const grouped = {};
+
+    inventory.forEach((item) => {
+      if (!item.productId) {
+        console.warn("Skipping inventory with missing product:", item._id);
+        return; // skip orphaned inventory records
+      }
+
+      const id = item.productId._id.toString();
+
+      if (!grouped[id]) {
+        grouped[id] = {
+          _id: id,
+          name: item.productId.name,
+          price: item.price,
+          imageUrl: item.productId.imageUrl,
+          totalQuantity: 0,
+          batches: [],
+          arrivalDate: item.addedDate,
+        };
+      }
+
+      grouped[id].totalQuantity += item.quantity;
+      grouped[id].batches.push({
+        quantity: item.quantity,
+        expiry: item.expiryDate,
+        batchId: item.batchId,
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      products: Object.values(grouped),
+    });
+  } catch (err) {
+    console.error("Error getting inventory:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch inventory" });
+  }
+};
+
+
+module.exports = {
+  addToInventory,
+  getAllInventoryItems,
+};
+const Order = require("../../database/models/order-pay-model");
+
+async function getBySessionId(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const order = await Order.findOne({ stripeSessionId: sessionId }).lean();
+    if (!order) return res.status(404).json({ message: "Order not found yet" });
+    res.json(order);
+  } catch (err) {
+    console.error("❌ getBySessionId error:", err);
+    res.status(500).json({ message: "Failed to fetch order" });
+  }
+}
+
+module.exports = { getBySessionId };
+// controllers/payment-controller.js
+const Cart = require("../../database/models/cart-model");
+const Retailer = require("../../database/models/retailer-model");
+const Order = require("../../database/models/order-pay-model");
+const Purchase = require("../../database/models/purchase-model");
+const Inventory = require("../../database/models/inventory-model");
+const Product = require("../../database/models/product-model");
+
+const {
+  createCheckoutSession,
+  verifyWebhook,
+} = require("../services/stripeService");
+
+// -------------------- Checkout --------------------
+const checkout = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer)
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+
+    const cart = await Cart.findOne({ retailerId: retailer._id });
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ success: false, message: "Cart is empty" });
+    }
+
+    const session = await createCheckoutSession(cart, retailer);
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("❌ Checkout error:", err);
+    res.status(500).json({ success: false, error: "Checkout failed" });
+  }
+};
+
+// -------------------- Webhook --------------------
+const handleWebhook = async (req, res) => {
+  try {
+    const sig = req.headers["stripe-signature"];
+    const event = verifyWebhook(sig, req.body);
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      console.log("✅ Payment success for session:", session.id);
+
+      const cart = await Cart.findById(session.client_reference_id).populate(
+        "retailerId"
+      );
+      if (!cart) {
+        console.error("❌ Cart not found for ID:", session.client_reference_id);
+        return res.status(404).json({ error: "Cart not found" });
+      }
+
+      const retailer = cart.retailerId;
+
+      const subtotal = cart.items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+
+      let discount = 0;
+      if (cart.promoCode === "DISCOUNT10") discount = subtotal * 0.1;
+
+      const finalAmount = subtotal - discount + (cart.shippingCost || 0);
+
+      // 📝 Create order
+      const order = new Order({
+        retailerId: retailer._id,
+        items: cart.items,
+        totalAmount: subtotal,
+        shippingMethod: cart.shippingMethod,
+        shippingCost: cart.shippingCost,
+        promoCode: cart.promoCode,
+        discount,
+        finalAmount,
+        currency: "inr",
+        paymentStatus: "paid",
+        orderStatus: "processing",
+        stripeSessionId: session.id,
+        stripePaymentIntentId: session.payment_intent,
+      });
+      await order.save();
+
+      // 📦 Deduct inventory for each item
+      for (const item of cart.items) {
+        let qtyToFulfill = item.quantity;
+
+        const availableInventory = await Inventory.find({
+          productId: item.productId,
+          currentStatus: "in_inventory",
+          assignedRetailer: null,
+        }).sort({ expiryDate: 1 });
+
+        for (const inv of availableInventory) {
+          if (qtyToFulfill <= 0) break;
+
+          const deduct = Math.min(inv.quantity, qtyToFulfill);
+          inv.quantity -= deduct;
+
+          if (inv.quantity === 0) {
+            inv.currentStatus = "sold";
+          }
+          await inv.save();
+
+          qtyToFulfill -= deduct;
+        }
+      }
+
+      // 📝 Create Purchase (mirror order)
+      const purchase = new Purchase({
+        retailerId: retailer._id,
+        retailerName: retailer.retailerName,
+        orders: await Promise.all(
+          cart.items.map(async (item) => {
+            const product = await Product.findById(item.productId);
+            return {
+              productId: item.productId,
+              productName: item.name,
+              quantity: item.quantity,
+              totalPrice: item.price * item.quantity,
+              imageUrl: product?.imageUrl || null,
+              status: "completed",
+            };
+          })
+        ),
+      });
+      await purchase.save();
+
+      // 🧹 Clear cart
+      cart.items = [];
+      cart.promoCode = null;
+      await cart.save();
+
+      console.log(
+        "✅ Order & Purchase created, inventory deducted, cart cleared:",
+        order._id
+      );
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error("❌ Webhook error:", err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+};
+
+module.exports = { checkout, handleWebhook };
+const Product = require("../../database/models/product-model");
+
+const addProducts = async (req, res) => {
+  try {
+    const { name, category, price, batches, imageUrl } = req.body;
+    console.log("Received product data:", {
+      name,
+      category,
+      price,
+      batches,
+      imageUrl,
+    });
+
+    if (
+      !name ||
+      !category ||
+      price === undefined ||
+      isNaN(Number(price)) ||
+      !batches ||
+      !Array.isArray(batches) ||
+      batches.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ error: "All fields are required and valid" });
+    }
+
+    const parsedPrice = Number(price);
+
+    let existingProduct = await Product.findOne({ name, category });
+
+    if (existingProduct) {
+      for (const batch of batches) {
+        const alreadyExists = existingProduct.batches.some(
+          (b) => b.batchId === batch.batchId
+        );
+        if (!alreadyExists) {
+          existingProduct.batches.push(batch);
+        }
+      }
+
+      await existingProduct.save();
+      return res.status(200).json({
+        message: "Batches added to existing product",
+        data: existingProduct,
+      });
+    }
+
+    const newProduct = await Product.create({
+      name,
+      category,
+      price: parsedPrice,
+      batches,
+      imageUrl,
+    });
+
+    res.status(201).json({ message: "Product created", data: newProduct });
+  } catch (error) {
+    console.error("Error creating product:", error);
+    res.status(500).json({ error: error.message || "Server error" });
+  }
+};
+
+
+const getAllProducts = async (req, res) => {
+  try {
+    const products = await Product.find({});
+    res.status(200).json({ success: true, products });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch products" });
+  }
+};
+
+const searchProducts = async (req, res) => {
+  const name = req.query.name;
+  const products = await Product.find({ name: new RegExp(name, "i") });
+  res.json(products);
+};
+
+module.exports = {
+  addProducts,
+  getAllProducts,
+  searchProducts,
+};
+const Purchase = require("../../database/models/purchase-model");
+const Inventory = require("../../database/models/inventory-model");
+const Retailer = require("../../database/models/retailer-model");
+const Product = require("../../database/models/product-model");
+
+// const addPurchase = async (req, res) => {
+//   try {
+//     const { productId, quantity } = req.body;
+
+//     const userId = req.userInfo?.userId;
+//     const retailer = await Retailer.findOne({ userId });
+//     if (!retailer) {
+//       return res.status(404).json({ error: "Retailer not found." });
+//     }
+
+//     const retailerId = retailer._id;
+//     if (!productId || !quantity) {
+//       return res.status(400).json({ error: "Missing required fields." });
+//     }
+
+//     const product = await Product.findById(productId);
+//     if (!product) {
+//       return res.status(404).json({ error: "Product not found." });
+//     }
+
+//     const availableInventory = await Inventory.find({
+//       productId,
+//       currentStatus: "in_inventory",
+//       assignedRetailer: null,
+//     }).sort({ expiryDate: 1 });
+
+//     const totalAvailable = availableInventory.reduce(
+//       (sum, item) => sum + item.quantity,
+//       0
+//     );
+
+//     if (totalAvailable < quantity) {
+//       return res.status(400).json({
+//         error: `Not enough inventory available. Only ${totalAvailable} units available, but ${quantity} requested.`,
+//       });
+//     }
+
+//     let qtyToFulfill = quantity;
+//     for (const item of availableInventory) {
+//       if (qtyToFulfill <= 0) break;
+
+//       const deduct = Math.min(item.quantity, qtyToFulfill);
+//       item.quantity -= deduct;
+
+//       if (item.quantity === 0) {
+//         item.currentStatus = "sold";
+//       }
+//       await item.save();
+
+//       qtyToFulfill -= deduct;
+//     }
+
+//     const totalPrice = quantity * product.price;
+
+//     const purchase = new Purchase({
+//       retailerId,
+//       retailerName: retailer.retailerName,
+//       orders: [
+//         {
+//           productId,
+//           productName: product.name,
+//           quantity,
+//           totalPrice,
+//           imageUrl: product.imageUrl,
+//           status: "completed",
+//         },
+//       ],
+//     });
+
+//     await purchase.save();
+
+//     console.log(`✅ Purchase completed for retailer ${retailer.retailerName}:`);
+//     console.log(`   - Product: ${product.name}`);
+//     console.log(`   - Quantity: ${quantity}`);
+//     console.log(`   - Deducted from inventory only`);
+
+//     return res.status(201).json({ message: "Purchase recorded", purchase });
+//   } catch (error) {
+//     console.error("Error adding purchase:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// };
+
+const getAllPurchasesRetailer = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    const purchases = await Purchase.find({ retailerId: retailer._id })
+      .populate("retailerId", "name email")
+      .sort({ date: -1 });
+
+    const formatted = purchases.map((purchase) => ({
+      _id: purchase._id,
+      retailerId: purchase.retailerId?._id || purchase.retailerId,
+      retailerName: purchase.retailerId?.name,
+      date: purchase.date,
+      orders: purchase.orders.map((order) => ({
+        productId: order.productId,
+        productName: order.productName,
+        quantity: order.quantity,
+        totalPrice: order.totalPrice,
+        imageUrl: order.imageUrl || null,
+        _id: order._id,
+      })),
+    }));
+
+    res.status(200).json({ success: true, purchases: formatted });
+  } catch (error) {
+    console.error("Error fetching Retailer Purchases:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch Purchases" });
+  }
+};
+
+const getAllPurchasesAdmin = async (req, res) => {
+  try {
+    const purchases = await Purchase.find({})
+      .populate("retailerId", "name email")
+      .sort({ date: -1 });
+
+    const formatted = purchases.map((purchase) => ({
+      _id: purchase._id,
+      retailerId: purchase.retailerId?._id || purchase.retailerId,
+      retailerName: purchase.retailerId?.name,
+      date: purchase.date,
+      orders: purchase.orders.map((order) => ({
+        productId: order.productId,
+        productName: order.productName,
+        quantity: order.quantity,
+        totalPrice: order.totalPrice,
+        imageUrl: order.imageUrl || null,
+        _id: order._id,
+      })),
+    }));
+
+    res.status(200).json({ success: true, purchases: formatted });
+  } catch (error) {
+    console.error("Error fetching Admin Purchases:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch Purchases" });
+  }
+};
+
+module.exports = {
+  // addPurchase,
+  getAllPurchasesRetailer,
+  getAllPurchasesAdmin,
+};
+
+const crypto = require("crypto");
+const User = require("../../database/models/register-model");
+
+const requestPasswordReset = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res
+      .status(404)
+      .json({ success: false, message: "No user found with that email" });
+  }
+
+  const expiry = Date.now() + 1000 * 60 * 15;
+  const token = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpires = expiry;
+
+  await user.save({ validateModifiedOnly: true });
+
+  const resetLink = `http://localhost:5173/reset-password/${token}`;
+
+  // Simulate sending email (log to console for now)
+  console.log(`Reset link (email this): ${resetLink}`);
+
+  return res.status(200).json({
+    success: true,
+    message: "Password reset link sent (check your email)",
+  });
+};
+
+module.exports = requestPasswordReset;
+const User = require("../../database/models/register-model");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password are required.",
+      });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired token." });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully.",
+    });
+  } catch (err) {
+    console.error("Error in resetPassword:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error. Please try again." });
+  }
+};
+
+module.exports = resetPassword;
+const Retailer = require("../../database/models/retailer-model");
+const Product = require("../../database/models/product-model");
+const Inventory = require("../../database/models/inventory-model");
+const Purchase = require("../../database/models/purchase-model");
+
+const addSalesData = async (req, res) => {
+  try {
+    const {
+      productId,
+      productName,
+      unitsSold,
+      saleDate,
+      batchId,
+      priceAtSale,
+    } = req.body;
+
+    if (!unitsSold || (!productId && !productName)) {
+      return res.status(400).json({
+        success: false,
+        message: "unitsSold and (productId or productName) are required",
+      });
+    }
+
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    const product = productId
+      ? await Product.findById(productId)
+      : await Product.findOne({ name: productName });
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    const qty = Number(unitsSold);
+    if (Number.isNaN(qty) || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "unitsSold must be a positive number",
+      });
+    }
+
+    // Check if retailer has enough inventory for this product
+    const retailerInventory = await Inventory.find({
+      productId: product._id,
+      assignedRetailer: retailer._id,
+      currentStatus: { $in: ["assigned", "in_inventory"] },
+      quantity: { $gt: 0 },
+    }).sort({ expiryDate: 1 });
+
+    const totalAvailableQuantity = retailerInventory.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+
+    if (totalAvailableQuantity < qty) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient inventory. You have ${totalAvailableQuantity} units available, but trying to sell ${qty} units. Please purchase more inventory first.`,
+        availableQuantity: totalAvailableQuantity,
+        requestedQuantity: qty,
+        productName: product.name,
+      });
+    }
+
+    // Deduct from inventory (FIFO - First In, First Out)
+    let remainingQtyToDeduct = qty;
+    const updatedInventoryItems = [];
+
+    for (const item of retailerInventory) {
+      if (remainingQtyToDeduct <= 0) break;
+
+      const deductAmount = Math.min(item.quantity, remainingQtyToDeduct);
+      item.quantity -= deductAmount;
+      remainingQtyToDeduct -= deductAmount;
+
+      if (item.quantity === 0) {
+        item.currentStatus = "sold";
+      }
+
+      updatedInventoryItems.push(item.save());
+    }
+
+    // Save all inventory updates
+    await Promise.all(updatedInventoryItems);
+
+    const effectivePrice =
+      priceAtSale != null ? Number(priceAtSale) : Number(product.price);
+    const totalAmount = effectivePrice * qty;
+
+    const event = {
+      productId: product._id,
+      productName: product.name,
+      unitsSold: qty,
+      priceAtSale: effectivePrice,
+      totalAmount,
+      saleDate: saleDate ? new Date(saleDate) : new Date(),
+      batchId,
+    };
+
+    retailer.salesData.push(event);
+    await retailer.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Sales data recorded",
+      sale: event,
+      inventoryUpdated: true,
+    });
+  } catch (err) {
+    console.error("Add Sales Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};
+
+const getAvailableProducts = async (req, res) => {
+  try {
+    const inventory = await Inventory.find({
+      currentStatus: "in_inventory",
+      assignedRetailer: null,
+      quantity: { $gt: 0 },
+    });
+
+    const productMap = {};
+
+    for (const item of inventory) {
+      const productId = item.productId.toString();
+
+      if (!productMap[productId]) {
+        const product = await Product.findById(productId);
+        if (!product) continue;
+
+        productMap[productId] = {
+          productId: product._id,
+          productName: product.name,
+          totalAvailable: 0,
+          batches: [],
+        };
+      }
+
+      productMap[productId].totalAvailable += item.quantity;
+      productMap[productId].batches.push({
+        batchId: item.batchId,
+        quantity: item.quantity,
+        expiryDate: item.expiryDate,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: Object.values(productMap),
+    });
+  } catch (error) {
+    console.error("Error fetching available products:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getRetailerOrders = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    const retailer = await Retailer.findOne({ userId });
+    const retailerId = retailer._id;
+
+    const purchases = await Purchase.find({ retailerId }).sort({ date: -1 });
+
+    const formattedOrders = [];
+
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        formattedOrders.push({
+          productName: order.productName,
+          quantity: order.quantity,
+          totalPrice: order.totalPrice,
+          purchasedAt: purchase.date,
+        });
+      }
+    }
+
+    res.status(200).json({ success: true, orders: formattedOrders });
+  } catch (err) {
+    console.error("Fetch orders error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getAllRetailers = async (req, res) => {
+  try {
+    const retailers = await Retailer.find({});
+    res.status(200).json({ success: true, retailers });
+  } catch (error) {
+    console.error("Error fetching retailers:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch retailers" });
+  }
+};
+
+const getRetailersWithStats = async (req, res) => {
+  try {
+    const retailers = await Retailer.find({});
+    const purchases = await Purchase.find({});
+
+    const retailerStats = {};
+
+    purchases.forEach((purchase) => {
+      const rid = purchase.retailerId?.toString();
+      if (!rid) return;
+
+      if (!retailerStats[rid]) {
+        retailerStats[rid] = {
+          totalOrders: 0,
+          totalSpent: 0,
+        };
+      }
+
+      retailerStats[rid].totalOrders += purchase.orders.length;
+
+      purchase.orders.forEach((order) => {
+        retailerStats[rid].totalSpent += order.totalPrice || 0;
+      });
+    });
+
+    const enrichedRetailers = retailers.map((ret) => {
+      const stats = retailerStats[ret._id.toString()] || {
+        totalOrders: 0,
+        totalSpent: 0,
+      };
+
+      return {
+        _id: ret._id,
+        name: ret.retailerName || ret.name,
+        email: ret.email,
+        mobileNumber: ret.mobileNumber || "N/A",
+        address: ret.address || "N/A",
+        totalOrders: stats.totalOrders,
+        totalSpent: stats.totalSpent,
+      };
+    });
+
+    res.status(200).json({ success: true, retailers: enrichedRetailers });
+  } catch (err) {
+    console.error("❌ Error getting retailer stats:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getRetailerSalesSummary = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailerFromUser = await Retailer.findOne({ userId });
+    if (!retailerFromUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    const { from, to, productId } = req.query;
+
+    const retailer = await Retailer.findById(retailerFromUser._id, {
+      salesData: 1,
+    }).lean();
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    let sales = retailer.salesData || [];
+
+    if (from) {
+      const fromDate = new Date(from);
+      sales = sales.filter((s) => new Date(s.saleDate) >= fromDate);
+    }
+    if (to) {
+      const toDate = new Date(to);
+      sales = sales.filter((s) => new Date(s.saleDate) <= toDate);
+    }
+    if (productId) {
+      sales = sales.filter((s) => s.productId.toString() === productId);
+    }
+
+    const summaryMap = {};
+    for (const s of sales) {
+      const key = s.productId.toString();
+      if (!summaryMap[key]) {
+        summaryMap[key] = {
+          productId: s.productId,
+          productName: s.productName,
+          unitPrice: s.priceAtSale,
+          unitsSold: 0,
+          revenue: 0,
+        };
+      }
+      summaryMap[key].unitsSold += s.unitsSold;
+      summaryMap[key].revenue += s.totalAmount || 0;
+    }
+
+    return res
+      .status(200)
+      .json({ success: true, summary: Object.values(summaryMap) });
+  } catch (err) {
+    console.error("getRetailerSalesSummary error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getRetailerSales = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailerFromUser = await Retailer.findOne({ userId });
+    if (!retailerFromUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    const retailerId = retailerFromUser._id;
+    const { from, to, productId } = req.query;
+
+    const retailer = await Retailer.findById(retailerId, {
+      salesData: 1,
+    }).lean();
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found" });
+    }
+
+    let sales = retailer.salesData || [];
+
+    if (from) {
+      const fromDate = new Date(from);
+      sales = sales.filter((s) => new Date(s.saleDate) >= fromDate);
+    }
+    if (to) {
+      const toDate = new Date(to);
+      sales = sales.filter((s) => new Date(s.saleDate) <= toDate);
+    }
+    if (productId) {
+      sales = sales.filter((s) => s.productId.toString() === productId);
+    }
+
+    return res.status(200).json({ success: true, sales });
+  } catch (err) {
+    console.error("getRetailerSales error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getRetailerInventory = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Find retailer linked to this user
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    console.log(
+      `🔍 Looking for purchases for retailer: ${retailer.name} (ID: ${retailer._id})`
+    );
+
+    const purchases = await Purchase.find({
+      retailerId: retailer._id,
+    }).sort({ date: -1 });
+
+    console.log(`🧾 Found ${purchases.length} purchase records for retailer`);
+
+    const inventorySummary = {};
+
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        const productId = order.productId.toString();
+
+        if (!inventorySummary[productId]) {
+          inventorySummary[productId] = {
+            productId: order.productId,
+            productName: order.productName,
+            totalQuantity: 0,
+            orders: [],
+          };
+        }
+
+        inventorySummary[productId].totalQuantity += order.quantity;
+        inventorySummary[productId].orders.push({
+          orderId: order._id,
+          quantity: order.quantity,
+          totalPrice: order.totalPrice,
+          purchaseId: purchase._id,
+          date: purchase.date,
+        });
+      }
+    }
+
+    console.log(`📊 Inventory summary:`, inventorySummary);
+
+    return res.status(200).json({
+      success: true,
+      inventory: Object.values(inventorySummary),
+    });
+  } catch (err) {
+    console.error("getRetailerInventory error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+
+const fixInventoryAssignments = async (req, res) => {
+  try {
+    const userId = req.userInfo?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const retailer = await Retailer.findOne({ userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer not found for this user" });
+    }
+
+    console.log(`🔧 Fixing inventory assignments for retailer: ${retailer.retailerName}`);
+
+    // Get all purchases for this retailer
+    const purchases = await Purchase.find({ retailerId: retailer._id });
+    console.log(`📋 Found ${purchases.length} purchases for retailer`);
+
+    let fixedCount = 0;
+    const results = [];
+
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        const product = await Product.findById(order.productId);
+        if (!product) continue;
+
+        // Check if retailer already has inventory for this product
+        const existingInventory = await Inventory.find({
+          productId: order.productId,
+          assignedRetailer: retailer._id,
+          currentStatus: { $in: ["assigned", "in_inventory"] },
+        });
+
+        const totalExistingQuantity = existingInventory.reduce((sum, item) => sum + item.quantity, 0);
+
+        if (totalExistingQuantity < order.quantity) {
+          // Need to create additional inventory
+          const neededQuantity = order.quantity - totalExistingQuantity;
+          
+          // Find available unassigned inventory
+          const availableInventory = await Inventory.find({
+            productId: order.productId,
+            currentStatus: "in_inventory",
+            assignedRetailer: null,
+            quantity: { $gt: 0 },
+          }).sort({ expiryDate: 1 });
+
+          let qtyToAssign = neededQuantity;
+          for (const item of availableInventory) {
+            if (qtyToAssign <= 0) break;
+
+            const assignAmount = Math.min(item.quantity, qtyToAssign);
+            
+            // Reduce the original inventory
+            item.quantity -= assignAmount;
+            if (item.quantity === 0) {
+              item.currentStatus = "sold";
+            }
+            await item.save();
+
+            // Create new inventory for retailer
+            const newInventoryItem = new Inventory({
+              productId: item.productId,
+              batchId: item.batchId,
+              price: item.price,
+              quantity: assignAmount,
+              expiryDate: item.expiryDate,
+              currentStatus: "assigned",
+              assignedRetailer: retailer._id,
+              imageUrl: item.imageUrl,
+            });
+            
+            await newInventoryItem.save();
+            qtyToAssign -= assignAmount;
+            fixedCount++;
+          }
+
+          results.push({
+            product: product.name,
+            requested: order.quantity,
+            existing: totalExistingQuantity,
+            fixed: neededQuantity - qtyToAssign,
+          });
+        }
+      }
+    }
+
+    console.log(`✅ Fixed ${fixedCount} inventory items for retailer`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Fixed ${fixedCount} inventory assignments`,
+      results,
+    });
+  } catch (err) {
+    console.error("fixInventoryAssignments error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = {
+  addSalesData,
+  getAvailableProducts,
+  getRetailerOrders,
+  getAllRetailers,
+  getRetailersWithStats,
+  getRetailerSales,
+  getRetailerSalesSummary,
+  getRetailerInventory,
+  fixInventoryAssignments,
+};
+const Product = require("../../database/models/product-model");
+const Inventory = require("../../database/models/inventory-model");
+const Retailer = require("../../database/models/retailer-model");
+const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
+const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const {
+  generateSuggestionsForExpiringProducts,
+} = require("../services/generateSuggestions");
+
+let lastRunAt = 0;
+const THROTTLE_MS = 60_000;
+
+async function maybeGenerate() {
+  const now = Date.now();
+  if (now - lastRunAt > THROTTLE_MS) {
+    await generateSuggestionsForExpiringProducts();
+    lastRunAt = now;
+  }
+}
+
+const getExpiringProductSuggestions = async (req, res) => {
+  const suggestions = [];
+  try {
+    const thresholdDays = 60;
+    const thresholdDate = new Date(
+      Date.now() + thresholdDays * 24 * 60 * 60 * 1000
+    );
+
+    const expiringInventory = await Inventory.find({
+      expiryDate: { $lte: thresholdDate },
+      currentStatus: "in_inventory",
+      quantity: { $gt: 0 },
+    });
+
+    for (const inventoryItem of expiringInventory) {
+      const suggestion = await getSmartRoutingSuggestion(
+        inventoryItem.productId
+      );
+      const product = await Product.findById(inventoryItem.productId);
+
+      if (suggestion.message?.startsWith("No retailer has sales history")) {
+        continue;
+      }
+
+      suggestions.push({
+        product: {
+          id: product._id,
+          name: product.name,
+          expiresInDays: Math.ceil(
+            (new Date(inventoryItem.expiryDate) - Date.now()) /
+              (1000 * 60 * 60 * 24)
+          ),
+        },
+        suggestion,
+      });
+    }
+
+    res.status(200).json({ success: true, suggestions });
+  } catch (error) {
+    console.error("Smart routing error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+const getRetailerSuggestions = async (req, res) => {
+  try {
+    await maybeGenerate();
+
+    const retailer = await Retailer.findOne({ userId: req.userInfo.userId });
+    if (!retailer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Retailer profile not found" });
+    }
+
+    const suggestions = await SuggestedPurchase.find({
+      retailerId: retailer._id,
+    })
+      .populate("productId")
+      .populate("inventoryId");
+
+    res.status(200).json({
+      success: true,
+      suggestions: suggestions.map((s) => ({
+        suggestionId: s._id.toString(),
+        productName: s.productId?.name ?? "Unknown",
+        quantity: s.quantity,
+        status: s.status,
+        attempts: s.attempts ?? 1,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Retailer suggestions error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getAllSuggestions = async (req, res) => {
+  try {
+    const suggestions = await SuggestedPurchase.find()
+      .populate("productId")
+      .populate("retailerId");
+
+    res.status(200).json({
+      success: true,
+      suggestions: suggestions.map((s) => ({
+        productName: s.productId?.name || "Unknown",
+        retailerName: s.retailerId?.name || "Unknown",
+        quantity: s.quantity,
+        status: s.status,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Admin suggestions error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = {
+  getExpiringProductSuggestions,
+  getRetailerSuggestions,
+  getAllSuggestions,
+};
+
+const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
+const Purchase = require("../../database/models/purchase-model");
+const Inventory = require("../../database/models/inventory-model");
+const Product = require("../../database/models/product-model");
+const Retailer = require("../../database/models/retailer-model");
+const fallbackSuggestionHandler = require("../services/fallback");
+
+const pendingSuggestions = async (req, res) => {
+  try {
+    const suggestions = await SuggestedPurchase.find({
+      retailerId: req.userInfo.userId,
+      status: "pending",
+    }).populate("productId");
+
+    res.status(200).json({ success: true, suggestions });
+  } catch (err) {
+    console.error("Fetch Suggestions Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const confirmSuggestion = async (req, res) => {
+  try {
+    const suggestion = await SuggestedPurchase.findById(
+      req.params.suggestionId
+    );
+    if (!suggestion) {
+      return res
+        .status(404)
+        .json({ message: "Suggestion not found or already confirmed" });
+    }
+
+    const inventoryItem = await Inventory.findById(suggestion.inventoryId);
+    if (!inventoryItem || inventoryItem.quantity < suggestion.quantity) {
+      return res.status(400).json({ message: "Not enough stock in inventory" });
+    }
+
+    const product = await Product.findById(suggestion.productId);
+    const retailer = await Retailer.findById(suggestion.retailerId);
+
+    // Decrement inventory
+    inventoryItem.quantity -= suggestion.quantity;
+    await inventoryItem.save();
+
+    // Create a proper Purchase document
+    await Purchase.create({
+      retailerId: suggestion.retailerId,
+      retailerName: retailer?.name,
+      orders: [
+        {
+          productId: suggestion.productId,
+          productName: product?.name,
+          quantity: suggestion.quantity,
+          totalPrice: suggestion.quantity * (inventoryItem.price || 0),
+        },
+      ],
+      date: new Date(),
+    });
+
+    suggestion.status = "confirmed";
+    await suggestion.save();
+
+    res
+      .status(200)
+      .json({ message: "Suggestion confirmed and purchase completed" });
+  } catch (err) {
+    console.error("Confirm Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const rejectSuggestion = async (req, res) => {
+  try {
+    const suggestion = await SuggestedPurchase.findById(
+      req.params.suggestionId
+    );
+    if (!suggestion || suggestion.status !== "pending") {
+      return res
+        .status(404)
+        .json({ message: "Suggestion not found or not pending." });
+    }
+
+    suggestion.status = "rejected";
+    await suggestion.save();
+    await fallbackSuggestionHandler();
+
+    res.status(200).json({ message: "Suggestion rejected successfully." });
+  } catch (err) {
+    console.error("Reject Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = {
+  pendingSuggestions,
+  confirmSuggestion,
+  rejectSuggestion,
+};

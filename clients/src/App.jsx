@@ -5,6 +5,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import RetailerDashboard from "./pages/RetailerDashboard";
 import ForgotPassword from "./pages/ForgotPassword";
 import ChangePassword from "./pages/ResetPassword";
+import PaymentSuccess from "./components/retailer/stripe/PaymentSuccess";
+import PaymentCancel from "./components/retailer/stripe/PaymentCancel";
 
 const App = () => {
   const { currentUser } = useAuth();
@@ -29,6 +31,8 @@ const App = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ChangePassword />} />
 
+      <Route path="/success" element={<PaymentSuccess />} />
+      <Route path="/cancel" element={<PaymentCancel />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

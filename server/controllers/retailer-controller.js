@@ -376,6 +376,7 @@ const getRetailerInventory = async (req, res) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
+    // Find retailer linked to this user
     const retailer = await Retailer.findOne({ userId });
     if (!retailer) {
       return res
@@ -383,43 +384,43 @@ const getRetailerInventory = async (req, res) => {
         .json({ success: false, message: "Retailer not found for this user" });
     }
 
-    console.log(`🔍 Looking for inventory for retailer: ${retailer.retailerName} (ID: ${retailer._id})`);
+    console.log(
+      `🔍 Looking for purchases for retailer: ${retailer.name} (ID: ${retailer._id})`
+    );
 
-    const retailerInventory = await Inventory.find({
-      assignedRetailer: retailer._id,
-      currentStatus: { $in: ["assigned", "in_inventory"] },
-      quantity: { $gt: 0 },
-    }).populate("productId");
+    const purchases = await Purchase.find({
+      retailerId: retailer._id,
+    }).sort({ date: -1 });
 
-    console.log(`📦 Found ${retailerInventory.length} inventory items for retailer`);
+    console.log(`🧾 Found ${purchases.length} purchase records for retailer`);
 
     const inventorySummary = {};
-    
-    for (const item of retailerInventory) {
-      const productId = item.productId._id.toString();
-      
-      if (!inventorySummary[productId]) {
-        inventorySummary[productId] = {
-          productId: item.productId._id,
-          productName: item.productId.name,
-          totalQuantity: 0,
-          batches: [],
-        };
+
+    for (const purchase of purchases) {
+      for (const order of purchase.orders) {
+        const productId = order.productId.toString();
+
+        if (!inventorySummary[productId]) {
+          inventorySummary[productId] = {
+            productId: order.productId,
+            productName: order.productName,
+            totalQuantity: 0,
+            orders: [],
+          };
+        }
+
+        inventorySummary[productId].totalQuantity += order.quantity;
+        inventorySummary[productId].orders.push({
+          orderId: order._id,
+          quantity: order.quantity,
+          totalPrice: order.totalPrice,
+          purchaseId: purchase._id,
+          date: purchase.date,
+        });
       }
-      
-      inventorySummary[productId].totalQuantity += item.quantity;
-      inventorySummary[productId].batches.push({
-        batchId: item.batchId,
-        quantity: item.quantity,
-        expiryDate: item.expiryDate,
-        status: item.currentStatus,
-      });
     }
 
-    console.log(`📊 Inventory summary:`, Object.keys(inventorySummary).map(key => ({
-      product: inventorySummary[key].productName,
-      quantity: inventorySummary[key].totalQuantity
-    })));
+    console.log(`📊 Inventory summary:`, inventorySummary);
 
     return res.status(200).json({
       success: true,
@@ -430,6 +431,8 @@ const getRetailerInventory = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
 
 const fixInventoryAssignments = async (req, res) => {
   try {

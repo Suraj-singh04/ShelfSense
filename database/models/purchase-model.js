@@ -12,6 +12,12 @@ const OrderItemSchema = new mongoose.Schema({
     required: true,
   },
   totalPrice: Number,
+  image: String,
+  status: {
+    type: String,
+    enum: ["pending", "completed", "cancelled"],
+    default: "pending",
+  },
 });
 
 const PurchaseSchema = new mongoose.Schema({

@@ -266,12 +266,13 @@ const AddInventory = ({ products = [], inventory = [] }) => {
                       <td className="p-4">
                         {item.batches
                           .map((b) =>
-                            b.expiryDate
-                              ? new Date(b.expiryDate).toLocaleDateString()
+                            b.expiry
+                              ? new Date(b.expiry).toLocaleDateString()
                               : "N/A"
                           )
                           .join(", ")}
                       </td>
+
                       <td className="p-4">
                         {item.arrivalDate
                           ? new Date(item.arrivalDate).toLocaleDateString()

@@ -33,7 +33,7 @@ const suggestedPurchaseSchema = new mongoose.Schema(
     },
     attempts: {
       type: Number,
-      default: 1,
+      default: 0,
     },
     triedRetailers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Retailer" }],
   },

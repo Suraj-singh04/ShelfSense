@@ -6,46 +6,79 @@ import {
   Plus,
 } from "lucide-react";
 import { authorizedFetch } from "../../utils/api";
+import { useState } from "react";
 
 const DashboardOverview = () => {
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalInventory, setTotalInventory] = useState(0);
+  const [totalRetaiers, setTotalRetaiers] = useState(0);
+
   const fetchRecentProducts = async () => {
     try {
       const res = await authorizedFetch("/api/products/get");
       const data = await res.json();
 
       const products = data.products;
-      console.log("All products count:", products.length);
+      setTotalProducts(products.length);
+      // console.log("All products count:", products.length);
     } catch (err) {
       console.error("Error fetching recent products:", err);
     }
   };
   fetchRecentProducts();
 
+  const fetchInventory = async () => {
+    try {
+      const res = await authorizedFetch("/api/inventory/get");
+      const data = await res.json();
+      // console.log(data);
+      const products = data.products;
+
+      const total = products.reduce((sum, item) => sum + item.totalQuantity, 0);
+      setTotalInventory(total);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchInventory();
+
+  const fetchRetailers = async () => {
+    try {
+      const res = await authorizedFetch("/api/retailer/get");
+      const data = await res.json();
+      const retailers = data.retailers;
+      setTotalRetaiers(retailers.length);
+    } catch (err) {
+      console.error("Error fetching recent products:", err);
+    }
+  };
+  fetchRetailers();
+
   const stats = [
     {
       title: "Total Products",
-      value: "1",
+      value: totalProducts,
       change: "+12%",
       icon: Package,
       color: "from-purple-500 to-purple-700",
     },
     {
       title: "Total Inventory",
-      value: "8,543",
+      value: totalInventory,
       change: "+5%",
       icon: ShoppingCart,
       color: "from-green-500 to-green-700",
     },
     {
       title: "Active Retailers",
-      value: "156",
+      value: totalRetaiers,
       change: "+8%",
       icon: Users,
       color: "from-blue-500 to-blue-700",
     },
     {
       title: "Expiring Soon",
-      value: "23",
+      value: 23,
       change: "-3%",
       icon: AlertTriangle,
       color: "from-orange-500 to-red-600",

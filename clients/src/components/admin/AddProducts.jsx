@@ -86,28 +86,6 @@ export default function ProductManager() {
       if (res.ok) {
         setMessage(`✅ Product added: ${name}`);
 
-        // Add to inventory
-        try {
-          const inventoryRes = await authorizedFetch("/api/inventory/add", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: data.product?._id,
-              batchId,
-              quantity: 0,
-              expiryDate,
-              arrivalDate: new Date().toISOString(),
-            }),
-          });
-
-          const inventoryData = await inventoryRes.json();
-          if (!inventoryRes.ok) {
-            console.warn("⚠️ Inventory add failed:", inventoryData.message);
-          }
-        } catch (invErr) {
-          console.error("❌ Error adding to inventory:", invErr);
-        }
-
         // Reset form
         setName("");
         setCategory("");

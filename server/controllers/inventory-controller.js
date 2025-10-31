@@ -1,6 +1,5 @@
 const Inventory = require("../../database/models/inventory-model");
 const Product = require("../../database/models/product-model");
-const refreshSmartSuggestion = require("../services/refreshSmartSuggestion");
 
 const addToInventory = async (req, res) => {
   try {
@@ -45,8 +44,6 @@ const addToInventory = async (req, res) => {
       imageUrl: product.imageUrl,
     });
 
-    await refreshSmartSuggestion(productId, inventoryItem._id);
-
     return res.status(201).json({
       message: "Inventory added successfully",
       data: inventoryItem,
@@ -78,6 +75,7 @@ const getAllInventoryItems = async (req, res) => {
           _id: id,
           name: item.productId.name,
           price: item.price,
+          category: item.category,
           imageUrl: item.productId.imageUrl,
           totalQuantity: 0,
           batches: [],

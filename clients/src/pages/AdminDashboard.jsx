@@ -26,7 +26,6 @@ const navItems = [
   { name: "Purchases", path: "purchases", icon: "🛒" },
   { name: "Retailers", path: "retailers", icon: "👥" },
   { name: "Suggestions", path: "suggestions", icon: "💡" },
-  { name: "Image Test", path: "image-test", icon: "🖼️" },
 ];
 
 const AdminDashboard = () => {

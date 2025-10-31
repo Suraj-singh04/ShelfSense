@@ -10,12 +10,11 @@ const authRoutes = require("./routes/auth-routes");
 const homeRoutes = require("./routes/home-routes");
 const adminRoutes = require("./routes/admin-routes");
 const purchaseRoutes = require("./routes/purchase");
-const smartRoutingRoutes = require("./routes/smart-routing");
 const assignToRetailerRoutes = require("./routes/assignToRetailer");
-const suggestionRoutes = require("./routes/suggestions");
 const uploadRoute = require("./routes/upload");
-
-const runSmartRoutingScheduler = require("./scheduler");
+const cartRoutes = require("./routes/cart");
+const paymentRoutes = require("./routes/payment");
+const order = require("./routes/order");
 // const clearAllData = require("../database/temp");
 
 // clearAllData();
@@ -37,6 +36,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+const paymentController = require("./controllers/payment-controller");
+app.post(
+  "/api/payment/webhook",
+  express.raw({ type: "application/json" }),
+  paymentController.handleWebhook
+);
+
 app.use(express.json());
 app.use("/api/upload", uploadRoute);
 app.use("/api/products", products);
@@ -47,9 +53,10 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/inventory", inventory);
 app.use("/api/retailer", retailer);
 app.use("/api/purchase", purchaseRoutes);
-app.use("/api/smart-routing", smartRoutingRoutes);
+app.use("/api/cart", cartRoutes);
 app.use("/api/assign", assignToRetailerRoutes);
-app.use("/api/suggestions", suggestionRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/order", order);
 
 connectToDB()
   .then(() => {
@@ -59,8 +66,7 @@ connectToDB()
       console.log(`📍 API endpoints available at http://localhost:${PORT}/api`);
       console.log(`🔗 Frontend should connect to: http://localhost:${PORT}`);
     });
-
-    runSmartRoutingScheduler();
+    0;
   })
   .catch((err) => {
     console.error("❌ Failed to connect to database:", err);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { authorizedFetch } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -11,10 +12,11 @@ const OrderHistory = () => {
   const [filter, setFilter] = useState("All");
   const { user } = useAuth();
 
+  const navigate = useNavigate();
+
   useEffect(() => {
     const fetchOrdersAndInventory = async () => {
       try {
-        // Fetch inventory (for product images)
         const inventoryRes = await authorizedFetch("/api/inventory/get");
         const inventoryData = await inventoryRes.json();
 
@@ -26,9 +28,9 @@ const OrderHistory = () => {
 
         const purchasesRes = await authorizedFetch("/api/purchase/get");
         const purchasesData = await purchasesRes.json();
+        console.log(purchasesData);
 
         if (purchasesData.success && Array.isArray(purchasesData.purchases)) {
-          // ✅ Backend already filters by retailer/admin, so no need to filter again
           const mergedOrders = purchasesData.purchases.map((purchase) => ({
             ...purchase,
             orders: purchase.orders.map((item) => {
@@ -38,12 +40,14 @@ const OrderHistory = () => {
               );
               return {
                 ...item,
+                status: item.status,
                 imageUrl: productInfo?.imageUrl || "/placeholder.png",
               };
             }),
           }));
 
           setOrders(mergedOrders);
+          // console.log(mergedOrders);
         } else {
           setError("⚠️ No orders found.");
         }
@@ -54,7 +58,6 @@ const OrderHistory = () => {
         setLoading(false);
       }
     };
-
     if (user) fetchOrdersAndInventory();
   }, [user]);
 
@@ -148,22 +151,50 @@ const OrderHistory = () => {
                   </p>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      item.status === "completed"
+                      item.status?.toLowerCase() === "completed"
                         ? "bg-green-100 text-green-600"
-                        : item.status === "Pending"
+                        : item.status?.toLowerCase() === "pending"
                         ? "bg-yellow-100 text-yellow-600"
                         : "bg-red-100 text-red-600"
                     }`}
                   >
-                    {item.status || "Pending"}
+                    {item.status
+                      ? item.status.charAt(0).toUpperCase() +
+                        item.status.slice(1)
+                      : "Pending"}
                   </span>
+
                   <div>
                     {item.status === "Cancelled" ? (
                       <button className="mt-2 px-4 py-1 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition">
                         Buy Again
                       </button>
                     ) : (
-                      <button className="mt-2 px-4 py-1 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await authorizedFetch(
+                              `/api/order/latest-by-product/${item.productId}`
+                            );
+                            const data = await res.json();
+
+                            console.log("Fetched order:", data.order);
+
+                            if (data.success && data.order) {
+                              navigate(`/retailer-dashboard/invoice`, {
+                                state: { order: data.order },
+                              });
+                            } else {
+                              alert("No invoice found for this product yet.");
+                            }
+                          } catch (err) {
+                            console.error("Error finding order:", err);
+                            alert("Unable to fetch invoice at the moment.");
+                          }
+                        }}
+                        className="mt-2 px-4 py-1 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                      >
                         View Invoice
                       </button>
                     )}

@@ -28,7 +28,6 @@ const AvailableProducts = () => {
   }, []);
   console.log(error);
 
-  // Filter + Search
   const filtered = products
     .filter((product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase())

@@ -1,4 +1,3 @@
-// src/components/OrderModal.jsx
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { authorizedFetch } from "../../utils/api";
@@ -8,7 +7,7 @@ const OrderModal = ({ product, onClose }) => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleOrder = async () => {
+  const handleAddToCart = async () => {
     setMessage("");
     if (quantity <= 0) {
       setMessage("⚠️ Enter a valid quantity.");
@@ -17,7 +16,7 @@ const OrderModal = ({ product, onClose }) => {
 
     try {
       setLoading(true);
-      const res = await authorizedFetch("/api/purchase/buy", {
+      const res = await authorizedFetch("/api/cart/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -29,14 +28,15 @@ const OrderModal = ({ product, onClose }) => {
       if (!res.ok) {
         const text = await res.text();
         console.error("❌ Server response (not OK):", text);
-        setMessage("❌ Server error while placing order.");
+        setMessage("❌ Failed to add product to cart.");
         return;
       }
 
-      setMessage("✅ Order placed successfully!");
+      setMessage("✅ Added to cart!");
+      setTimeout(() => onClose(), 1000); // close modal after success
     } catch (err) {
-      console.error("Order failed:", err);
-      setMessage("❌ Failed to place order.");
+      console.error("Add to cart failed:", err);
+      setMessage("❌ Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -119,13 +119,13 @@ const OrderModal = ({ product, onClose }) => {
           </span>
         </div>
 
-        {/* Place Order Button */}
+        {/* Add to Cart Button */}
         <button
-          onClick={handleOrder}
+          onClick={handleAddToCart}
           disabled={loading}
-          className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm disabled:opacity-50 transition"
+          className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm disabled:opacity-50 transition"
         >
-          {loading ? "Placing..." : "Place Order"}
+          {loading ? "Adding..." : "Add to Cart"}
         </button>
 
         {/* Message */}

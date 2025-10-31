@@ -1,6 +1,5 @@
-const Product = require("../../database/models/product-model");
 const Inventory = require("../../database/models/inventory-model");
-const getSmartRoutingSuggestion = require("../services/smartRoutingSuggestion");
+const Product = require("../../database/models/product-model");
 const SuggestedPurchase = require("../../database/models/suggested-purchase-model");
 
 const assignRetailersToExpiringProducts = async (req, res) => {
@@ -10,57 +9,52 @@ const assignRetailersToExpiringProducts = async (req, res) => {
       Date.now() + thresholdDays * 24 * 60 * 60 * 1000
     );
 
-    // Get products that are expiring soon
-    const expiringProducts = await Product.find({
+    // Find inventory expiring soon
+    const expiringInventories = await Inventory.find({
+      currentStatus: "in_inventory",
       expiryDate: { $lte: thresholdDate },
-    });
+      quantity: { $gt: 0 },
+    }).populate("productId");
 
     const results = [];
 
-    for (const product of expiringProducts) {
-      // Get available inventory for this product
-      const availableInventories = await Inventory.find({
-        productId: product._id,
-        assignedRetailer: null,
-        currentStatus: "in_inventory",
-      });
+    for (const item of expiringInventories) {
+      const product = item.productId;
+      if (!product) continue;
 
-      if (availableInventories.length === 0) continue;
-
+      // Skip if a suggestion already exists
       const existingSuggestion = await SuggestedPurchase.findOne({
         productId: product._id,
+        inventoryId: item._id,
         status: "pending",
       });
-
       if (existingSuggestion) {
         console.log(`Skipping ${product.name}, already has a suggestion.`);
         continue;
       }
 
-      // Get best retailer suggestion
-      const suggestion = await getSmartRoutingSuggestion(product._id);
-      if (!suggestion.suggestedRetailer?.id) continue;
-
-      // Assign each inventory item to suggested retailer
-      for (const item of availableInventories) {
-        item.assignedRetailer = suggestion.suggestedRetailer.id;
-        item.currentStatus = "assigned";
-        await item.save();
-      }
+      // ✅ Since smartRoutingSuggestion is gone, we directly create a SuggestedPurchase.
+      // You may later enhance this by picking a retailer from your Retailer model.
+      await SuggestedPurchase.create({
+        productId: product._id,
+        inventoryId: item._id,
+        // placeholder retailer — can be chosen by your own logic
+        retailerId: null,
+        quantity: item.quantity,
+        status: "pending",
+        suggestedAt: new Date(),
+      });
 
       results.push({
-        product: {
-          id: product._id,
-          name: product.name,
-        },
-        assignedTo: suggestion.suggestedRetailer.name,
-        itemsAssigned: availableInventories.length,
+        product: { id: product._id, name: product.name },
+        assignedTo: "Unassigned (manual assignment required)",
+        itemsAssigned: item.quantity,
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Retailers assigned to expiring products",
+      message: "Retailer suggestions created for expiring products",
       results,
     });
   } catch (error) {
@@ -69,6 +63,4 @@ const assignRetailersToExpiringProducts = async (req, res) => {
   }
 };
 
-module.exports = {
-  assignRetailersToExpiringProducts,
-};
+module.exports = { assignRetailersToExpiringProducts };

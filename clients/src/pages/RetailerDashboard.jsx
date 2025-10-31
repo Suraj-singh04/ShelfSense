@@ -17,10 +17,13 @@ import OrderHistory from "../components/retailer/OrderHistory";
 import { useAuth } from "../context/AuthContext";
 import AddSales from "../components/retailer/AddSales";
 import SmartSuggestions from "../components/retailer/SmartSuggestions";
+import Cart from "../components/retailer/Cart";
+import InvoicePage from "../components/retailer/stripe/InvoicePage";
 
 const navItems = [
   { name: "Dashboard", path: "", icon: "🏠" },
   { name: "Buy Products", path: "buy-products", icon: "🛒" },
+  { name: "Cart", path: "cart", icon: "🛍️" },
   { name: "Order History", path: "order-history", icon: "🕒" },
   { name: "Daily Sales", path: "daily-sales", icon: "📈" },
   { name: "Sales Analytics", path: "sales-analytics", icon: "📊" },
@@ -177,9 +180,12 @@ const RetailerDashboard = () => {
           <Routes>
             <Route index element={<DashboardOverview />} />
             <Route path="buy-products" element={<AvailableProducts />} />
+            <Route path="cart" element={<Cart />} />
+
             <Route path="order-history" element={<OrderHistory />} />
             <Route path="daily-sales" element={<AddSales />} />
             <Route path="recommendations" element={<SmartSuggestions />} />
+            <Route path="invoice" element={<InvoicePage />} />
 
             <Route path="*" element={<Navigate to="/retailer-dashboard" />} />
           </Routes>
